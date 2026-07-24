@@ -1,0 +1,27 @@
+# Preset small — para desenvolvimento/CPU e testes rápidos do pipeline.
+# Roda de ponta a ponta com o corpus fallback embutido em scripts/pretrain.py.
+model:
+  preset: small         # d=128, L=6, H=4
+  vocab_size: 512       # alvo pequeno: corpus de brinquedo satura antes disso
+  context_len: 64
+  rope_base: 10000.0
+  dropout: 0.1
+
+train:
+  lr_max: 3.0e-3        # lr alto: corpus minúsculo, acelera a convergência
+  lr_min_ratio: 0.1
+  weight_decay: 0.1
+  betas: [0.9, 0.999]
+  warmup_cap: 20
+  grad_clip: 1.0
+  grad_accum: 1
+  max_epochs: 8
+  patience: 4
+  batch_size: 8
+  use_bf16: false       # CPU: FP32
+
+data:
+  corpus_path: data/corpus.jsonl
+  tokenizer_path: data/tokenizer_small.json
+  tokens_cache: data/corpus_tokens_small.pt
+  stride: null          # null => chunked (stride = context_len)

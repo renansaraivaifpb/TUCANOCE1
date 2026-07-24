@@ -1,0 +1,27 @@
+# Treino no corpus real de física de partículas (data/corpus.jsonl, ~532K tokens),
+# dimensionado para rodar em CPU em ~15 min. Para GPU, use configs/medium.yaml.
+model:
+  preset: small         # d=128, L=6, H=4 (~2.5M params com vocab 4096)
+  vocab_size: 4096      # apropriado p/ 532K tokens (nb 02: vocab vs tamanho do corpus)
+  context_len: 128
+  rope_base: 10000.0
+  dropout: 0.1
+
+train:
+  lr_max: 6.0e-4
+  lr_min_ratio: 0.1
+  weight_decay: 0.1
+  betas: [0.9, 0.999]
+  warmup_cap: 200
+  grad_clip: 1.0
+  grad_accum: 1
+  max_epochs: 12
+  patience: 4
+  batch_size: 16
+  use_bf16: false       # CPU: FP32
+
+data:
+  corpus_path: data/corpus.jsonl
+  tokenizer_path: data/tokenizer_physics.json
+  tokens_cache: data/corpus_tokens_physics.pt
+  stride: null          # chunked (stride = context_len)

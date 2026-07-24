@@ -1,0 +1,29 @@
+# Treino no TinyStories (data/corpus_tinystories.jsonl), dimensionado para CPU.
+# TinyStories é texto de baixa entropia (vocabulário infantil): um modelo pequeno
+# CONSEGUE ser coerente nele — o contrário da prosa técnica de física/ML. Espere,
+# pela 1ª vez, frases inteiras que fazem sentido. Para GPU/escala, ver medium.yaml.
+model:
+  preset: small         # d=128, L=6, H=4 (~2.5M params com vocab 4096)
+  vocab_size: 4096      # generoso p/ o vocabulário simples do TinyStories
+  context_len: 128
+  rope_base: 10000.0
+  dropout: 0.1
+
+train:
+  lr_max: 6.0e-4
+  lr_min_ratio: 0.1
+  weight_decay: 0.1
+  betas: [0.9, 0.999]
+  warmup_cap: 200
+  grad_clip: 1.0
+  grad_accum: 1
+  max_epochs: 8         # corpus maior => menos épocas bastam
+  patience: 3
+  batch_size: 32        # batch maior: melhor throughput em CPU, texto fácil
+  use_bf16: false       # CPU: FP32
+
+data:
+  corpus_path: data/corpus_tinystories.jsonl
+  tokenizer_path: data/tokenizer_tinystories.json
+  tokens_cache: data/corpus_tokens_tinystories.pt
+  stride: null          # chunked (stride = context_len)

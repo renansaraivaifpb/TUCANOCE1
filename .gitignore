@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Artefatos gerados (recriáveis pelos scripts) — pesados demais para o repositório
+data/*.jsonl
+data/*.pt
+data/*.json
+checkpoints/*.pt
+
+# Mantém as pastas e seus READMEs no repositório
+!data/README.md
+!checkpoints/README.md
+
+# Materiais de estudo (PDFs — não versionar; alguns têm direitos autorais)
+*.pdf
+
+# SO / editor
+.DS_Store
+.vscode/

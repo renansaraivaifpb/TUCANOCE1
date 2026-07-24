@@ -1,0 +1,26 @@
+[project]
+name = "tucanoce"
+version = "0.1.0"
+description = "Construção educacional de um LM estilo LLaMA (GPT-2 modernizado) em GPU de consumo"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.2",
+    "numpy",
+    "requests",     # scraping Wikipedia
+    "pyyaml",       # camada de config
+    "tqdm",
+]
+
+[project.optional-dependencies]
+notebooks = ["jupyter", "matplotlib", "nbformat"]
+dev = ["pytest", "ruff"]
+app = ["streamlit"]     # chat playground: streamlit run app/chat.py
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# permite `import tucanoce...` nos testes sem instalar o pacote
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
