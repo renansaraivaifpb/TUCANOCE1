@@ -1,9 +1,9 @@
-"""Tokenizer BPE byte-level estilo GPT-2 (paper seção 3, Algorithms 1 e 2).
+"""Tokenizer BPE byte-level estilo GPT-2 (nb 02; SENNRICH et al., 2016).
 
 Opera sobre bytes (0-255), não caracteres Unicode. Treina merges iterativos:
 conta pares adjacentes mais frequentes e funde até atingir vocab_size.
 
-Gargalos e otimizações (seção 3.2.2, 3.4):
+Gargalos e otimizações (nb 02, 3.4):
 - treino dos merges: O(n) scan por merge; aceitável em Python p/ corpus pequeno.
 - encoding: reimplementado em C via ctypes em produção (~100x). Aqui, Python puro.
 - cache em disco dos tokens (load_or_cache_corpus), invalidado por mtime.
@@ -70,7 +70,7 @@ class BPETokenizer:
     def train(self, corpus: list[str]) -> None:
         """Algorithm 1: par mais frequente -> token novo, repetir até vocab_size.
 
-        Otimização de produção (§3.2.2): em vez de manter a lista de TODOS os chunks
+        Otimização de produção (nb 02): em vez de manter a lista de TODOS os chunks
         (com repetições), colapsamos em contagens de palavras únicas e ponderamos as
         estatísticas de pares pela frequência. Como texto é Zipfiano (poucas palavras
         dominam), isso é ordens de magnitude mais rápido e produz merges IDÊNTICOS.

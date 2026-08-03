@@ -7,7 +7,7 @@ Escolha honesta de design: este é um LM BASE (só pré-treino, sem SFT/instruct
 Ele NÃO segue instruções nem "responde perguntas" — ele CONTINUA texto. A UI de
 chat é uma conveniência: cada turno alimenta o histórico como prompt e o modelo
 continua a escrever. É um "playground de continuação" com cara de chat. Instruct
-(SFT+LoRA) é o próximo passo do roadmap (ARCHITECTURE.md §9).
+(SFT+LoRA) é o próximo passo do roadmap (ver ARCHITECTURE.md).
 """
 from __future__ import annotations
 

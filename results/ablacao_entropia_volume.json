@@ -1,0 +1,70 @@
+{
+  "n_tokens": 415878,
+  "n_params": 1803904,
+  "config": "configs/physics_cpu.yaml",
+  "best_val_loss": 1.8229732557579323,
+  "best_epoch": 12,
+  "history": [
+    {
+      "epoch": 1,
+      "val_loss": 3.1614378293355307,
+      "acc": 0.46785783179012347
+    },
+    {
+      "epoch": 2,
+      "val_loss": 2.4088433465839905,
+      "acc": 0.5602334104938271
+    },
+    {
+      "epoch": 3,
+      "val_loss": 2.159974314548351,
+      "acc": 0.5842013888888888
+    },
+    {
+      "epoch": 4,
+      "val_loss": 2.041288116831838,
+      "acc": 0.5993200231481481
+    },
+    {
+      "epoch": 5,
+      "val_loss": 1.9681403931276298,
+      "acc": 0.6073495370370371
+    },
+    {
+      "epoch": 6,
+      "val_loss": 1.9168108745857522,
+      "acc": 0.6164641203703703
+    },
+    {
+      "epoch": 7,
+      "val_loss": 1.8797405354770613,
+      "acc": 0.6209008487654321
+    },
+    {
+      "epoch": 8,
+      "val_loss": 1.8534461583620236,
+      "acc": 0.6264949845679012
+    },
+    {
+      "epoch": 9,
+      "val_loss": 1.8378692203097873,
+      "acc": 0.6293885030864198
+    },
+    {
+      "epoch": 10,
+      "val_loss": 1.8302776430859977,
+      "acc": 0.6309799382716049
+    },
+    {
+      "epoch": 11,
+      "val_loss": 1.8235496709376207,
+      "acc": 0.6306664737654321
+    },
+    {
+      "epoch": 12,
+      "val_loss": 1.8229732557579323,
+      "acc": 0.6315586419753086
+    }
+  ],
+  "sample": "Once upon a time, there was a little girl named Lily. She loved to play outside and explore the sky! One day, she went for many money to get something special. "
+}

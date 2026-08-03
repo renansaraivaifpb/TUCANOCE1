@@ -1,10 +1,10 @@
-"""RoPE — Rotary Position Embeddings (paper seção 5.3, Listing 3).
+"""RoPE — Rotary Position Embeddings (nb 04).
 
 Em vez de somar embeddings posicionais (GPT-2), rotaciona Q e K por um ângulo
 dependente da posição. A pontuação de atenção passa a depender só da posição
 RELATIVA (n - m), o que dá robustez a extrapolação de contexto.
 
-frequências: theta_i = base^(-2i/head_dim), base=10000 (seção 5.3.5).
+frequências: theta_i = base^(-2i/head_dim), base=10000 (nb 04).
 
 Ver derivação (invariância relativa) no notebook 04_modernizacao_llama.ipynb.
 """

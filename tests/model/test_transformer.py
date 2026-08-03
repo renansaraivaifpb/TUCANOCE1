@@ -43,7 +43,7 @@ def test_init_loss_near_log_vocab(tiny_cfg):
 
 
 def test_num_params_matches_paper():
-    # weight tying deduplicado por parameters(): medium ~= 42.7M (paper ~43M)
+    # weight tying deduplicado por parameters(): medium ~= 42.7M
     assert abs(TucanoCE(get_model_config("medium")).num_params() - 42_742_272) < 1000
 
 

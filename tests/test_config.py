@@ -1,4 +1,4 @@
-"""Testes de config.py — presets, hidden_dim (Eq. 36-37) e loader YAML."""
+"""Testes de config.py — presets, hidden_dim do SwiGLU e loader YAML."""
 from __future__ import annotations
 
 import pytest

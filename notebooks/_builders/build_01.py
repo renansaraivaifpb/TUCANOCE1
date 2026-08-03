@@ -1,4 +1,4 @@
-"""Gera 01_transformer_intuicao.ipynb — fundamentos teóricos do transformer (paper §2 + 3b1b cap.5)."""
+"""Gera 01_transformer_intuicao.ipynb — fundamentos teóricos do transformer (nb 01 + 3b1b cap.5)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,7 +7,7 @@ cells = [
 md(r"""
 # 01 — Intuição do transformer: atenção, Q/K/V e máscara causal
 
-> Destilado da **seção 2 do paper** (Fundamentos teóricos do transformer) e do
+> Destilado da **seção 2 do projeto** (Fundamentos teóricos do transformer) e do
 > capítulo 5 do 3Blue1Brown. É a base conceitual de
 > `src/tucanoce/model/layers/attention.py` e `src/tucanoce/model/block.py`.
 
@@ -53,7 +53,7 @@ $$ p_\theta(x_{t+1}\mid x_1,\dots,x_t). $$
 Gerar texto é um **loop**: amostrar $x_{t+1}$ dessa distribuição, concatenar ao
 prefixo, repetir. Parece estranho que "prever a próxima palavra" produza texto
 coerente — mas é exatamente isso que um LM faz, e a coerência emerge da **escala**
-(seção 2.1 do paper; o próprio Sanderson nota que GPT-2 num laptop mal faz sentido,
+(nb 01 do projeto; o próprio Sanderson nota que GPT-2 num laptop mal faz sentido,
 e trocar só a escala para GPT-3 muda o resultado).
 """),
 
@@ -93,7 +93,7 @@ $$ \mathbf{u}\cdot\mathbf{v} = \lVert\mathbf{u}\rVert\,\lVert\mathbf{v}\rVert\co
 
 positivo quando apontam no mesmo sentido, zero quando perpendiculares. Que a
 computação interna do transformer seja produto interno **não é coincidência** —
-é a operação que a arquitetura precisa que predomine (seção 2.9).
+é a operação que a arquitetura precisa que predomine (nb 01).
 """),
 
 code(r"""
@@ -173,7 +173,7 @@ Cada bloco tem dois estágios com papéis distintos:
 - **MLP** age *através das features* — refina cada token isoladamente.
 
 Essa alternância (misturar posições, depois misturar features) é o esqueleto da
-arquitetura. Usamos a convenção *batch-first* $T\times d$ do PyTorch (o paper de
+arquitetura. Usamos a convenção *batch-first* $T\times d$ do PyTorch (o projeto de
 Turner transpõe, mas descreve a mesma operação).
 """),
 
@@ -346,7 +346,7 @@ T, d, H = 5, 12, 3
 d_h = d // H                       # dimensão por cabeça = 4
 X = torch.randn(1, T, d)           # (batch=1, T, d)
 
-# Projeções combinadas (todas as cabeças de uma vez), sem bias — estilo do paper.
+# Projeções combinadas (todas as cabeças de uma vez), sem bias — estilo do projeto.
 W_Q = nn.Linear(d, d, bias=False)
 W_K = nn.Linear(d, d, bias=False)
 W_V = nn.Linear(d, d, bias=False)
@@ -486,7 +486,7 @@ md(r"""
 
 **Caminho de evolução:** os capítulos 5–6 do 3Blue1Brown para a intuição visual, e
 o *An Introduction to Transformers* (Turner, arXiv:2304.10557) para o formalismo
-matricial completo — as duas fontes que o paper segue nesta seção.
+matricial completo — as duas fontes que o projeto segue nesta seção.
 
 Próximo: **`02_tokenizacao_bpe.ipynb`** — como o texto vira os IDs que entram na
 embedding.

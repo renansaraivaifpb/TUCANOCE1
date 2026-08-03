@@ -1,4 +1,4 @@
-"""Gera 03_arquitetura_base.ipynb — transformer decoder-only estilo GPT-2 (paper §4)."""
+"""Gera 03_arquitetura_base.ipynb — transformer decoder-only estilo GPT-2 (nb 03)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,7 +7,7 @@ cells = [
 md(r"""
 # 03 — Arquitetura base: transformer decoder-only (estilo GPT-2)
 
-> Origem: paper §4 ("Arquitetura base — transformer *decoder-only*"). A intuição
+> Escopo: a arquitetura base *decoder-only*, no padrão GPT-2. A intuição
 > das peças (atenção, Q/K/V, máscara causal, MLP, resíduo) veio do notebook 01;
 > aqui elas viram `nn.Module` e são **montadas num modelo que roda**.
 
@@ -46,7 +46,7 @@ md(r"""
 ## 1. O esqueleto: o que um decoder-only calcula
 
 Dado um lote de IDs de tokens $x \in \mathbb{Z}^{B\times T}$, o *forward* é
-(paper Eqs. 17–20):
+(forma compacta):
 
 $$
 \begin{aligned}
@@ -160,7 +160,7 @@ md(r"""
 
 O segundo estágio do bloco é uma MLP aplicada a **cada posição isoladamente**
 (mesmos pesos em todas). No GPT-2 é uma sequência simples com **expansão de fator 4**
-e ativação **GELU** (paper §4.3, Eq. 25):
+e ativação **GELU** (HENDRYCKS; GIMPEL, 2016):
 
 $$ \text{MLP}(x) = \text{GELU}(x W_1)\, W_2, \quad W_1 \in \mathbb{R}^{d\times 4d},\ W_2 \in \mathbb{R}^{4d\times d} $$
 
@@ -196,10 +196,10 @@ aplicada **antes** de cada estágio (*pre-norm*):
 
 $$ h = h + \text{Attn}(\text{Norm}(h)); \qquad h = h + \text{MLP}(\text{Norm}(h)) $$
 
-Compare com o *post-norm* do paper original do transformer, que normaliza **depois**
+Compare com o *post-norm* do projeto original do transformer, que normaliza **depois**
 da soma: $h = \text{Norm}(h + \text{Attn}(h))$.
 
-**Por que pre-norm venceu (paper §4.1):** no pre-norm o caminho residual é uma
+**Por que pre-norm venceu (nb 03):** no pre-norm o caminho residual é uma
 "rodovia" limpa — $h$ passa reto, sem normalização no meio, e cada bloco só soma um
 ajuste já normalizado. Isso preserva o gradiente ao longo da profundidade. O
 post-norm coloca uma `Norm` **em cima** da soma a cada camada; empilhando >10
@@ -285,7 +285,7 @@ md(r"""
 ## 6. Inicialização: por que escalar as projeções residuais por $1/\sqrt{2L}$
 
 O GPT-2 inicializa os pesos `Linear` com $\mathcal{N}(0, 0.02^2)$ e os *biases* em
-zero. Há um detalhe sutil (paper §4.4): as **projeções residuais** — a `out_proj`
+zero. Há um detalhe sutil (nb 03): as **projeções residuais** — a `out_proj`
 da atenção e a `proj` (down) da MLP, isto é, exatamente os pesos cujo resultado é
 **somado** de volta na rodovia residual — recebem uma escala extra:
 
@@ -353,7 +353,7 @@ Agora juntamos tudo num `TucanoCE` de brinquedo. Dois pontos da montagem final:
 - **Init em duas passadas:** primeiro `apply(_init_weights)` põe todo `Linear`/`Embedding`
   em $\mathcal{N}(0,0.02^2)$ e zera *biases*; depois **sobrescrevemos** as projeções
   residuais com a escala $1/\sqrt{2L}$.
-- **Weight tying (paper §4.5):** a embedding de tokens $W_e$ e a projeção final para
+- **Weight tying (nb 03):** a embedding de tokens $W_e$ e a projeção final para
   *logits* compartilham os mesmos pesos, $W_{\text{lm\_head}} = W_e^\top$. Em código,
   basta `lm_head.weight = tok_emb.weight`. Economiza $V\cdot d$ parâmetros e tende a
   melhorar a qualidade.
@@ -436,7 +436,7 @@ print("\nTodas as checagens passaram.")
 
 code(r"""
 # Economia do weight tying: V*d parâmetros que NÃO são duplicados.
-V_full, d_full = 8192, 512          # preset 'medium' do paper
+V_full, d_full = 8192, 512          # preset 'medium' do projeto
 economia = V_full * d_full
 total_medium = 43_000_000
 print(f"weight tying economiza V*d = {economia:,} params (~{economia/1e6:.1f}M)")
@@ -448,7 +448,7 @@ md(r"""
 Onde moram os parâmetros? A figura agrupa os pesos do modelo brinquedo por
 componente. Mesmo aqui a **MLP** já domina o orçamento dos blocos — no GPT-2/GPT-3
 real ela concentra ~2/3 do total. É contraintuitivo: a "atenção" dá nome à
-arquitetura, mas a maior parte da capacidade está nas MLPs (paper §2.6).
+arquitetura, mas a maior parte da capacidade está nas MLPs (nb 01).
 """),
 
 code(r"""

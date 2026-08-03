@@ -1,13 +1,13 @@
-"""Loop de treino (paper seção 7).
+"""Loop de treino (nb 06).
 
 Componentes:
-- Objetivo: cross-entropy autoregressiva (Eq. 57), F.cross_entropy(logits, targets).
+- Objetivo: cross-entropy autoregressiva, F.cross_entropy(logits, targets).
 - AdamW com weight decay separado: decay=0.1 em matrizes Linear, decay=0 em
-  biases/normalizações (parâmetros 1D) — seção 7.2.
-- Scheduler cosine com warmup linear (Eq. 58); T_w = min(T/10, 2000).
-- BF16 via torch.amp.autocast; dispensa GradScaler (seção 7.4).
-- Gradient clipping por norma global em 1.0 (Eq. 59) + gradient accumulation.
-- Early stopping com save-best por val_loss (seção 7.6).
+  biases/normalizações (parâmetros 1D) — nb 06.
+- Scheduler cosine com warmup linear (LOSHCHILOV; HUTTER, 2017); T_w = min(T/10, 2000).
+- BF16 via torch.amp.autocast; dispensa GradScaler (nb 06).
+- Gradient clipping por norma global em 1.0 (PASCANU et al., 2013) + gradient accumulation.
+- Early stopping com save-best por val_loss (nb 06).
 
 Ver notebook 06_treinamento.ipynb.
 """
@@ -24,7 +24,7 @@ from .evaluate import evaluate
 
 
 def build_param_groups(model, weight_decay: float):
-    """Separa parâmetros 2D+ (com decay) de 1D (sem decay). Seção 7.2.
+    """Separa parâmetros 2D+ (com decay) de 1D (sem decay). nb 06.
 
     Decaimento faz sentido em matrizes (regularização), mas penalizar o gamma de
     uma norma ou um bias — que controlam ESCALA/deslocamento — distorce o
@@ -44,7 +44,7 @@ def build_param_groups(model, weight_decay: float):
 
 def _make_lr_lambda(total_steps: int, warmup_cap: int, warmup_ratio: float,
                     min_ratio: float):
-    """Multiplicador de lr_max: warmup linear + decaimento cosseno até min_ratio (Eq. 58)."""
+    """Multiplicador de lr_max: warmup linear + decaimento cosseno até min_ratio (LOSHCHILOV; HUTTER, 2017)."""
     warmup = min(int(total_steps * warmup_ratio), warmup_cap)
     warmup = max(warmup, 1)
 
@@ -60,7 +60,7 @@ def _make_lr_lambda(total_steps: int, warmup_cap: int, warmup_ratio: float,
 
 def train(model, train_loader, val_loader, cfg, device=None,
           ckpt_path: str = "checkpoints/best.pt"):
-    """Loop de pré-treino completo (§7). Retorna dict com melhor val_loss, epoch e histórico.
+    """Loop de pré-treino completo (nb 06). Retorna dict com melhor val_loss, epoch e histórico.
 
     Fia as seis peças: cross-entropy autoregressiva, AdamW com weight decay
     separado, scheduler cosseno+warmup, autocast BF16 (sem GradScaler), grad

@@ -1,9 +1,9 @@
-"""TextDataset com stride configurável (paper seção 6.2, Listing 5).
+"""TextDataset com stride configurável (nb 05).
 
 O gargalo escondido: sliding window de stride=1 gera N-T_ctx amostras (cada token
 em T_ctx amostras). Chunked (stride=T_ctx) gera ~N/T_ctx amostras, cada token em
 exatamente uma amostra por epoch. Ganho ~124x em steps/epoch sem perda de qualidade
-(seção 6.2.4). Default = chunked; stride=1 fica para ablações.
+(nb 05). Default = chunked; stride=1 fica para ablações.
 
 Ver notebook 05_pipeline_dados.ipynb.
 """

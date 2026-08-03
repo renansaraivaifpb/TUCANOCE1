@@ -1,13 +1,13 @@
-"""Avaliação (paper seção 8.2).
+"""Avaliação (nb 07).
 
 Métricas:
 - val_loss (cross-entropy em nats/token) — o que o early stopping monitora.
 - next-token accuracy.
 - bits per character (BPC): L_val / (bytes_por_token * ln 2). Comparável entre
-  tokenizers diferentes, ao contrário da cross-entropy crua (Eq. 61).
+  tokenizers diferentes, ao contrário da cross-entropy crua.
 
 Interpretação: o piso trivial sem modelo é log(V). A redução mede informação
-ganha por token (Eq. 60).
+ganha por token.
 
 Ver notebook 07_avaliacao_scaling.ipynb.
 """

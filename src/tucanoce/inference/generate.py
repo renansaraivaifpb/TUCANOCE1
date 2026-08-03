@@ -1,16 +1,16 @@
-"""Geração autoregressiva com KV-cache (paper seção 5.4).
+"""Geração autoregressiva com KV-cache (nb 04).
 
 Sem cache, cada passo refaz o forward inteiro: O(L*d^2*N*(p+N)), quadrático em N.
 Com cache, K,V das posições já processadas são reaproveitados (a máscara causal
-garante que não mudam): O(L*d^2*N), linear em N (Eq. 51 vs 52).
+garante que não mudam): O(L*d^2*N), linear em N (contra O(L*d^2*N^2) sem cache).
 
 Detalhes:
 - offset posicional em RoPE: token novo no passo k está na posição global p+k;
-  usa cos/sin dessa posição, não da posição 0 (Eq. 54). Tratado na atenção.
+  usa cos/sin dessa posição, não da posição 0. Tratado na atenção.
 - máscara: no prefill Q e K têm mesmo T (is_causal=True); no decode Q tem 1 token
-  e "vê" todo o cache sem máscara (Listing 4).
+  e "vê" todo o cache sem máscara.
 
-Sampling (seção 2.8): temperatura, top-k, top-p, repetition penalty.
+Sampling (nb 01): temperatura, top-k, top-p, repetition penalty.
 
 Ver notebook 07_avaliacao_scaling.ipynb (uso) e 04 (mecânica do cache).
 """

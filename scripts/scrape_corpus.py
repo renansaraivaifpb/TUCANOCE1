@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from tucanoce.data.scrape import scrape_categories
 
-# Categorias de machine learning densas em inglês (§6.1): profundidade técnica alta.
+# Categorias de machine learning densas em inglês (nb 05): profundidade técnica alta.
 ML_CATEGORIES = [
     "Machine_learning", "Artificial_neural_networks", "Deep_learning",
     "Artificial_intelligence", "Natural_language_processing", "Computer_vision",

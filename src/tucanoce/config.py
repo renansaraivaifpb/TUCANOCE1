@@ -2,9 +2,10 @@
 
 Decisão de arquitetura: uma única fonte da verdade para hiperparâmetros, em vez
 de defaults espalhados pelo código (o erro nº1 apontado na seção 7 do blueprint).
-Presets vêm da Tabela de escalonamento do paper (seção 5.2.4 / 8.5).
+Presets seguem a família de escalas usada em LMs decoder-only pequenos
+(ver nb 07 para o diagnóstico de escala).
 
-`compute_hidden_dim` reproduz a Eq. (36)-(37): SwiGLU usa hidden ~ 8d/3 (para
+`compute_hidden_dim` segue a regra 8d/3 do SwiGLU (SHAZEER, 2020): SwiGLU usa hidden ~ 8d/3 (para
 casar a contagem de parâmetros da MLP GELU-4d do GPT-2), arredondado para múltiplo
 de 64 (alinhamento com o tile dos tensor cores da NVIDIA).
 """
@@ -20,12 +21,12 @@ def compute_hidden_dim(embed_dim: int, multiple_of: int = 64) -> int:
 
 @dataclass
 class ModelConfig:
-    vocab_size: int = 8192       # seção 3.3 — pequeno de propósito p/ corpus pequeno
+    vocab_size: int = 8192       # nb 02 — pequeno de propósito p/ corpus pequeno
     context_len: int = 512       # T_ctx
     n_layers: int = 12           # L
     n_heads: int = 8             # H
     embed_dim: int = 512         # d
-    rope_base: float = 10000.0   # seção 5.3.5
+    rope_base: float = 10000.0   # nb 04
     dropout: float = 0.1
     # hidden da MLP SwiGLU; None => calculado por compute_hidden_dim
     hidden_dim: int | None = None
@@ -40,7 +41,7 @@ class ModelConfig:
         return self.embed_dim // self.n_heads
 
 
-# Presets da Tabela de escalonamento (d, L, H) — seção 5.2.4 / 8.5.
+# Presets (d, L, H): família de escalas do projeto — ver nb 07.
 PRESETS: dict[str, dict] = {
     "small":  dict(embed_dim=128, n_layers=6,  n_heads=4),
     "base":   dict(embed_dim=256, n_layers=8,  n_heads=8),
@@ -82,7 +83,7 @@ def load_configs(path: str) -> tuple[ModelConfig, "TrainConfig", dict]:
 
 @dataclass
 class TrainConfig:
-    lr_max: float = 3e-4          # seção 7.2
+    lr_max: float = 3e-4          # nb 06
     lr_min_ratio: float = 0.1     # lr_min = 0.1 * lr_max
     weight_decay: float = 0.1
     betas: tuple = (0.9, 0.999)

@@ -1,15 +1,15 @@
-"""Modelo completo: transformer decoder-only (paper seção 4, Eqs. 17-20).
+"""Modelo completo: transformer decoder-only (nb 03).
 
     h0     = Embed(x)
     h_l    = bloco_l(h_{l-1})   para l = 1..L
-    logits = Norm(h_L) @ W_e^T   (weight tying — seção 4.5)
+    logits = Norm(h_L) @ W_e^T   (weight tying — nb 03)
 
-Inicialização (seção 4.4): Linear ~ N(0, 0.02^2); projeções residuais (out_proj
+Inicialização (nb 03): Linear ~ N(0, 0.02^2); projeções residuais (out_proj
 da atenção e down da MLP) escaladas por 1/sqrt(2L) para manter a norma O(1).
 
 forward(x, past_kvs=None, use_cache=False):
     - sem cache (treino/eval): retorna logits
-    - com cache (inferência): retorna (logits, new_past_kvs)  — seção 5.4.5
+    - com cache (inferência): retorna (logits, new_past_kvs)  — nb 04
 
 Ver notebooks 03_arquitetura_base.ipynb (base) e 04 (modernização).
 """
@@ -56,7 +56,7 @@ class TucanoCE(nn.Module):
         self.apply(self._init_module)
         # Passada 2: projeções residuais (out_proj da atenção e down da SwiGLU)
         # recebem escala 1/sqrt(2L) — cancela o crescimento ~sqrt(2L) da norma da
-        # rodovia residual (§4.4). São exatamente os pesos SOMADOS de volta em h.
+        # rodovia residual (nb 03). São exatamente os pesos SOMADOS de volta em h.
         std_res = 0.02 / math.sqrt(2 * self.cfg.n_layers)
         for name, p in self.named_parameters():
             if name.endswith("out_proj.weight") or name.endswith("down.weight"):

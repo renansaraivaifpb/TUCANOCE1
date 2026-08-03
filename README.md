@@ -57,14 +57,16 @@ python scripts/benchmark.py --gpt2 gpt2
 
 ## Achado central
 
-O gargalo de qualidade é **dado, não capacidade** (regime Chinchilla) — e, em modelo
-pequeno, o que manda é **casar a entropia do corpus com a capacidade do modelo**. O
+Em modelo pequeno, o que manda é **casar a entropia do corpus com a capacidade do
+modelo** — não o tópico nem, isoladamente, a contagem de parâmetros. O
 mesmo modelo de 1,8M params teve val_loss 3,09 (física) → 3,02 (ML) → **1,59
 (TinyStories)** sem qualquer mudança de arquitetura: só trocando para texto de menor
 entropia o modelo passou a gerar frases coerentes.
 
 ## Créditos
 
-Baseado num paper de referência de construção de LM (não incluído no repositório) e
-nas transcrições da série *Deep Learning* do 3Blue1Brown. As seções (§2–§8) citadas
-no código/notebooks remetem a esse paper.
+A derivação de cada componente remete às fontes primárias — Vaswani et al. (2017),
+Radford et al. (2019), Touvron et al. (2023), Zhang e Sennrich (2019), Shazeer (2020),
+Su et al. (2021), Hoffmann et al. (2022), Eldan e Li (2023) — e a intuição visual à
+série *Deep Learning* do 3Blue1Brown. As referências `nb 00`–`nb 07` no código apontam
+para os notebooks deste repositório, onde cada peça é derivada.

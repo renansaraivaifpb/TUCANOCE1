@@ -1,14 +1,14 @@
-"""Scraping de artigos da Wikipedia em inglês (paper seção 6.1).
+"""Scraping de artigos da Wikipedia em inglês (nb 05).
 
 Corpus em inglês (não português) de propósito: densidade muito maior em física
 técnica, o que testa melhor a arquitetura em domínio denso.
 
 Cada artigo vira uma linha JSONL: {text, title, source, category}.
 
-Robustez (seção 6.1.2): rate limit >= 1.5s entre requisições; respeitar o
+Robustez (nb 05): rate limit >= 1.5s entre requisições; respeitar o
 cabeçalho Retry-After em HTTP 429 em vez de backoff exponencial cego.
 
-Limpeza (seção 6.1.1): remover References/External links/See also/Further reading;
+Limpeza (nb 05): remover References/External links/See also/Further reading;
 remover marcadores [1],[2]; colapsar quebras de linha; descartar stubs (<300 chars).
 
 Ver notebook 05_pipeline_dados.ipynb.
@@ -21,9 +21,9 @@ import re
 import time
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
-MIN_INTERVAL = 1.5   # segundos entre requisições (§6.1.2)
+MIN_INTERVAL = 1.5   # segundos entre requisições (nb 05)
 
-# Seções cujo TÍTULO exato marca o fim do conteúdo útil (§6.1.1).
+# Seções cujo TÍTULO exato marca o fim do conteúdo útil (nb 05).
 DROP_SECTIONS = ("References", "External links", "See also", "Further reading",
                  "Notes", "Bibliography")
 
@@ -56,7 +56,7 @@ def _collapse_blank_lines(text: str) -> str:
 def _remove_math_markup(text: str) -> str:
     """Remove o TeX/MathML que os extracts da Wikipedia deixam vazar das fórmulas.
 
-    Curadoria de dados (§6.1.1): tags <math> vêm como blocos `{\\displaystyle ...}`
+    Curadoria de dados (nb 05): tags <math> vêm como blocos `{\\displaystyle ...}`
     precedidos por uma "árvore" MathML de caracteres soltos, um por linha, muito
     indentada. Sem isso o modelo aprende a cuspir LaTeX. Achado ao inspecionar as
     gerações — metade do corpus estava contaminada.
@@ -158,7 +158,7 @@ def _collect_titles(session, category: str, limit: int, include_subcats: bool) -
 
 
 # extracts aceita até 20 títulos por requisição (exlimit): ~20x menos chamadas que
-# 1-a-1, a otimização de produção que o paper menciona (§6.1.2).
+# 1-a-1, a otimização de produção descrita no nb 05.
 _EXLIMIT = 20
 
 

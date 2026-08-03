@@ -1,10 +1,10 @@
-"""RMSNorm — normalização estilo LLaMA (paper seção 5.1, Listing 1).
+"""RMSNorm — normalização estilo LLaMA (nb 04).
 
 Substitui LayerNorm: descarta a re-centralização (subtrair a média) e o bias beta,
 mantendo só a divisão pelo RMS. Geometricamente projeta x na esfera de raio sqrt(d)
 antes da escala gamma — preserva direção, descarta magnitude.
 
-Cuidado de precisão: a soma de quadrados é feita em FP32 mesmo sob BF16 (seção 5.1.6).
+Cuidado de precisão: a soma de quadrados é feita em FP32 mesmo sob BF16 (nb 04).
 
 Ver derivação e implementação no notebook 04_modernizacao_llama.ipynb.
 """
@@ -22,7 +22,7 @@ class RMSNorm(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # RMS calculado em FP32 mesmo sob BF16: a soma de d quadrados acumula erro
-        # em precisão reduzida (§5.1.6). Voltamos ao dtype de entrada só no fim.
+        # em precisão reduzida (nb 04). Voltamos ao dtype de entrada só no fim.
         dtype = x.dtype
         x_fp32 = x.float()
         rms = x_fp32.pow(2).mean(dim=-1, keepdim=True).add(self.eps).rsqrt()

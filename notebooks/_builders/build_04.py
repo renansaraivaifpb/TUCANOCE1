@@ -1,4 +1,4 @@
-"""Gera 04_modernizacao_llama.ipynb — do GPT-2 ao LLaMA (paper §5)."""
+"""Gera 04_modernizacao_llama.ipynb — do GPT-2 ao LLaMA (nb 04)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,7 +7,7 @@ cells = [
 md(r"""
 # 04 — Modernização: do GPT-2 ao LLaMA
 
-> Origem: paper §5 (Listings 1–4). Ponto de partida: a arquitetura base GPT-2 do
+> Escopo: as quatro modernizações do padrão LLaMA. Ponto de partida: a arquitetura base GPT-2 do
 > notebook 03. Aqui trocamos, peça por peça, os quatro componentes que a
 > comunidade aposentou nos últimos cinco anos.
 
@@ -271,7 +271,7 @@ def compute_hidden_dim(embed_dim, multiple_of=64):
     hidden = int(8 * embed_dim / 3)
     return ((hidden + multiple_of - 1) // multiple_of) * multiple_of
 
-# Reproduzindo a tabela de presets do paper (secao 5.2.4)
+# Reproduzindo a tabela de presets do projeto
 print(f"{'preset':<8}{'d':>6}{'8d/3':>8}{'h (arred.)':>12}")
 for name, d in [("small",128),("base",256),("medium",512),("large",768)]:
     print(f"{name:<8}{d:>6}{int(8*d/3):>8}{compute_hidden_dim(d):>12}")
@@ -619,7 +619,7 @@ code(r"""
 def kv_cache_mb(L, B, H, T, head_dim):
     return 2 * L * B * H * T * head_dim * 2 / 1e6
 
-# Preset medium do paper: L=12, H=8, head_dim=64, B=1, T=512
+# Preset medium do projeto: L=12, H=8, head_dim=64, B=1, T=512
 print(f"cache do medium (L=12,H=8,d_h=64,T=512): {kv_cache_mb(12,1,8,512,64):.1f} MB")
 print("Negligivel em qualquer GPU moderna -- o cache troca memoria barata por compute caro.")
 """),
@@ -646,7 +646,7 @@ ax.legend(); plt.tight_layout(); plt.show()
 
 md(r"""
 O KV-cache dá exatamente o mesmo resultado que recomputar tudo — só que linear em
-vez de quadrático. Um detalhe de API que o paper destaca (§5.4.5): o `forward`
+vez de quadrático. Um detalhe de API que o projeto destaca (nb 04): o `forward`
 deve retornar o cache **só quando pedido** (`use_cache=True`). Se sempre
 retornasse, as referências aos tensores $K,V$ persistiriam após o forward,
 anulando o *gradient checkpointing* do treino. Por isso o retorno é condicional.
@@ -676,7 +676,7 @@ GLU Variants (Shazeer, 2020), RoFormer/RoPE (Su et al., 2021). Ferramenta para
 comparar: as implementações de referência do LLaMA e do `nanoGPT` — leia lado a
 lado com o que você escreveu aqui.
 
-**Direções que o paper deixa para depois:** GQA (Grouped-Query Attention) reduz o
+**Direções que o projeto deixa para depois:** GQA (Grouped-Query Attention) reduz o
 KV-cache dividindo cabeças de K/V; Muon como otimizador; SFT + LoRA para virar
 assistente. Ficam para o roadmap do `ARCHITECTURE.md`.
 

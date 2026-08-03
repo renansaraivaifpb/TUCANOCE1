@@ -1,4 +1,4 @@
-"""Gera 05_pipeline_dados.ipynb — pipeline de dados (paper §6)."""
+"""Gera 05_pipeline_dados.ipynb — pipeline de dados (nb 05)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,14 +7,14 @@ cells = [
 md(r"""
 # 05 — Pipeline de dados: scraping, limpeza e o gargalo do dataset
 
-> Base: paper `constuir gptr.pdf`, §6 ("Pipeline de dados") + Listing 5 (TextDataset).
+> Escopo: coleta, limpeza, tokenização e particionamento do corpus.
 > Objetivo: montar o caminho que leva de *texto bruto na Wikipedia* até *tensores
 > de tokens prontos para o treino* — e entender por que a decisão mais barata desse
 > caminho (o `stride` do dataset) foi a que mais acelerou o projeto.
 
 Depois de saber *o que* o modelo calcula (nbs 01–04), falta o combustível: dados.
 Este notebook cobre a coleta, a limpeza, o empacotamento em janelas de contexto e
-o cache. O achado central do capítulo — e uma das lições mais úteis do paper — é
+o cache. O achado central do capítulo — e uma das lições mais úteis do projeto — é
 que **o gargalo de tempo raramente está onde você imagina**: aqui não era a GPU
 nem a arquitetura, era o *dataloader*.
 
@@ -47,7 +47,7 @@ print("torch", torch.__version__)
 md(r"""
 ## 1. Scraping: por que inglês, e como coletar sem apanhar do servidor
 
-O corpus do paper vem de artigos da Wikipedia **em inglês**, selecionados por
+O corpus inicial vem de artigos da Wikipedia **em inglês**, selecionados por
 categorias de física (`Particle_physics`, `Quantum_field_theory`, `Astrophysics`,
 `Black_holes`, …). A escolha do inglês é deliberada: para física técnica a
 Wikipedia inglesa tem profundidade e densidade muito maiores que a portuguesa, o
@@ -63,7 +63,7 @@ devolve texto plano sem HTML) e vira uma linha JSONL:
 O formato JSONL (uma linha = um artigo) é escolhido porque permite **agregar
 múltiplas fontes** no futuro sem reescrever nada: basta concatenar arquivos.
 
-### Robustez (§6.1.2): a parte que separa um scraper de brinquedo de um de produção
+### Robustez (nb 05): a parte que separa um scraper de brinquedo de um de produção
 A API tolera leituras frequentes, mas dispara **HTTP 429 (Too Many Requests)**
 acima de certo ritmo. Duas decisões importam:
 
@@ -75,12 +75,12 @@ acima de certo ritmo. Duas decisões importam:
 """),
 
 code(r'''
-import urllib.request  # (no código real do paper usa-se `requests`; stdlib aqui p/ não exigir dep)
+import urllib.request  # (no código real do projeto usa-se `requests`; stdlib aqui p/ não exigir dep)
 
 RUN_SCRAPE = False   # <- deixamos DESLIGADO: este notebook roda sem rede.
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
-MIN_INTERVAL = 1.5   # segundos entre requisições (§6.1.2)
+MIN_INTERVAL = 1.5   # segundos entre requisições (nb 05)
 
 def fetch_article_text(title: str, session_last_call: list) -> str | None:
     """Baixa o texto plano de UM artigo, respeitando rate limit e Retry-After.
@@ -109,7 +109,7 @@ def fetch_article_text(title: str, session_last_call: list) -> str | None:
             return page.get("extract")  # None se a página não existe
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                # --- respeita Retry-After; fallback = 30s (§6.1.2) ---
+                # --- respeita Retry-After; fallback = 30s (nb 05) ---
                 retry_after = int(e.headers.get("Retry-After", 30))
                 time.sleep(max(retry_after, 30))
                 continue
@@ -129,7 +129,7 @@ md(r"""
 
 O texto bruto traz lixo que não tem valor educacional: seções de `References`,
 `External links`, `See also`, `Further reading`, marcadores de citação `[1]`,
-`[2]`, e excesso de quebras de linha. A limpeza (§6.1.1) é uma sequência de
+`[2]`, e excesso de quebras de linha. A limpeza (nb 05) é uma sequência de
 transformações **puras** — cada uma faz uma coisa e pode ser testada sozinha —, e
 artigos muito curtos (*stubs* < 300 chars após limpeza) são descartados.
 
@@ -139,7 +139,7 @@ artigos muito curtos (*stubs* < 300 chars após limpeza) são descartados.
 """),
 
 code(r'''
-# Seções cujo TÍTULO exato marca o fim do conteúdo útil (§6.1.1).
+# Seções cujo TÍTULO exato marca o fim do conteúdo útil (nb 05).
 DROP_SECTIONS = ("References", "External links", "See also", "Further reading",
                  "Notes", "Bibliography")
 
@@ -174,7 +174,7 @@ def clean_article(text: str, min_chars: int = 300) -> str | None:
 ''' ),
 
 code(r'''
-# Teste em um artigo "sujo" mock, com asserts (§6.1.1).
+# Teste em um artigo "sujo" mock, com asserts (nb 05).
 dirty = (
     "Quarks are elementary particles[1] and a fundamental constituent of matter[2].\n\n\n\n"
     "There are six types, known as flavors[3]: up, down, charm, strange, top, and bottom.\n"
@@ -239,7 +239,7 @@ print("dtype:", tokens.dtype, "(int64 — LongTensor, o que a Embedding espera)"
 ''' ),
 
 md(r"""
-## 4. O gargalo escondido: `sliding window` vs `chunked` (§6.2)
+## 4. O gargalo escondido: `sliding window` vs `chunked` (nb 05)
 
 Aqui está a lição mais valiosa do capítulo. Para treinar um LM, quebramos o fluxo
 de tokens em janelas de tamanho `context_len` ($T_{ctx}$). A pergunta é: **de
@@ -253,7 +253,7 @@ Cada token aparece em $T_{ctx}$ amostras distintas (uma por posição relativa).
 $$ |\mathcal{D}|_{\text{chunked}} = \left\lfloor \frac{N-1}{T_{ctx}} \right\rfloor \quad\text{amostras} $$
 Cada token aparece em **exatamente uma** amostra por época.
 
-A razão entre os dois é ≈ $T_{ctx}$. No paper, com $T_{ctx} = 512$, isso significava
+A razão entre os dois é ≈ $T_{ctx}$. Para $T_{ctx} = 512$, isso significaria
 ~360 mil steps/época (sliding) contra ~700 (chunked) — a diferença entre um treino
 inviável (>24 h/época) e um de minutos. E o mais importante: **sem perda mensurável
 de qualidade**, porque o modelo continua vendo o mesmo conteúdo, só distribuído em
@@ -266,7 +266,7 @@ menos steps. É o padrão de GPT-2, LLaMA e praticamente todo modelo moderno.
 
 code(r'''
 class TextDataset(Dataset):
-    """Dataset de janelas de contexto com stride configurável (Listing 5, §6.2).
+    """Dataset de janelas de contexto com stride configurável (nb 05).
 
     stride=None  -> chunked (stride = context_len), o default de produção.
     stride=1     -> sliding window, só para ablações.
@@ -306,19 +306,19 @@ print(f"chunked (stride={T_ctx}):    {len(ds_chunked):3d} amostras   (~ floor((N
 razao = len(ds_sliding) / len(ds_chunked)
 print(f"razão sliding/chunked = {razao:.1f}x  (esperado ~ T_ctx = {T_ctx})")
 
-# A __len__ do Listing 5 é (N - ctx - 1)//stride + 1 — mais conservadora que a
-# fórmula simplificada floor((N-1)/T_ctx) do paper (garante x e y sem estourar).
+# A fórmula conservadora de `__len__` é (N - ctx - 1)//stride + 1 — mais conservadora que a
+# fórmula simplificada floor((N-1)/T_ctx) do projeto (garante x e y sem estourar).
 assert len(ds_sliding) == (N - T_ctx - 1) // 1 + 1 == N - T_ctx
 assert len(ds_chunked) == (N - T_ctx - 1) // T_ctx + 1
 assert abs(razao - T_ctx) < 2.0, "razão deveria ficar próxima de T_ctx"
-print("OK — |D| bate com a __len__ do Listing 5; razão ~ T_ctx.")
+print("OK — |D| bate com a __len__ implementada; razão ~ T_ctx.")
 ''' ),
 
 md(r"""
 As barras deixam a conta visível: **sliding** gera ~$T_{ctx}$× mais amostras que
 **chunked** para o *mesmo* corpus. Cada amostra a mais é um step de gradiente a
 mais por época — e, como as janelas do sliding se sobrepõem quase inteiras, é
-compute gasto vendo quase a mesma coisa. Foi essa razão (≈512 no paper) que separou
+compute gasto vendo quase a mesma coisa. Foi essa razão (≈512 no projeto) que separou
 um treino de minutos de um de mais de 24 h por época.
 """),
 
@@ -374,9 +374,9 @@ print("OK — y é x deslocado por 1 (next-token).")
 ''' ),
 
 md(r"""
-## 5. Cache de tokens: rápido, mas com uma armadilha (§6.3)
+## 5. Cache de tokens: rápido, mas com uma armadilha (nb 05)
 
-Tokenizar o corpus inteiro custa tempo (no paper, ~145 s por execução com o encoder
+Tokenizar o corpus inteiro custa tempo (no projeto, ~145 s por execução com o encoder
 em C). Rodar isso a cada `train.py` é tempo morto. A solução é **cachear os tokens
 em disco** (`torch.save` de um `LongTensor`) e recarregar em milissegundos.
 
@@ -399,7 +399,7 @@ code(r'''
 def load_or_cache_corpus(jsonl_path, cache_path, encode_fn, tokenizer_id: str):
     """Carrega tokens do cache se válido; senão re-tokeniza e regrava.
 
-    Validação robusta (§6.3): além do mtime, guardamos um hash/id do tokenizer no
+    Validação robusta (nb 05): além do mtime, guardamos um hash/id do tokenizer no
     cache. Se qualquer um divergir, re-tokeniza. Isso fecha o buraco do 'retreinei
     o tokenizer mas o corpus não mudou'.
     """
@@ -453,7 +453,7 @@ print("OK — cache válido em hit; re-tokeniza quando o tokenizer muda.")
 md(r"""
 ## Resumo (o que carregar para o notebook 06)
 
-| Peça | Decisão do paper | Onde vive no `src/` |
+| Peça | Decisão do projeto | Onde vive no `src/` |
 |---|---|---|
 | Scraping | inglês (densidade técnica), JSONL por artigo | `data/scrape.py` |
 | Rate limit | Δt ≥ 1,5 s + respeitar `Retry-After` | `data/scrape.py` |
@@ -466,7 +466,7 @@ md(r"""
 arquitetura ou o backend de compute. Era o *dataloader*. Meça onde o tempo
 realmente vai antes de otimizar a peça errada.
 
-**Caminho de evolução:** o próprio paper aponta (§9.3) que o próximo salto de
+**Caminho de evolução:** o gargalo apontado pelo diagnóstico de escala é que o próximo salto de
 qualidade vem de **mais dados** (~100M tokens: `mC4-en`/OSCAR filtrados, Common
 Crawl com filtro de qualidade), não de mais parâmetros — o regime Chinchilla que o
 notebook 07 detalha.

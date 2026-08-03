@@ -12,16 +12,16 @@ cada `.ipynb` é regenerável a partir do seu builder em `notebooks/_builders/`,
 trazem **figuras matplotlib** embutidas (23 no total) ilustrando os conceitos geométricos
 (paisagem de custo, heatmaps de atenção, rotação de RoPE, curvas de treino, Chinchilla, etc.).
 
-| # | Notebook | Paper | Peça(s) de `src/` que alimenta |
+| # | Notebook | Tema | Peça(s) de `src/` que alimenta |
 |---|---|---|---|
 | 00 | `00_fundamentos_nn.ipynb` | 3b1b 1–4 | (base conceitual: backprop, gradient descent) |
-| 01 | `01_transformer_intuicao.ipynb` | §2 | `model/layers/attention.py`, `model/block.py` |
-| 02 | `02_tokenizacao_bpe.ipynb` | §3 | `tokenizer/bpe.py` |
-| 03 | `03_arquitetura_base.ipynb` | §4 | `model/block.py`, `model/transformer.py` |
-| 04 | `04_modernizacao_llama.ipynb` | §5 | `model/layers/{rmsnorm,swiglu,rope,attention}.py` |
-| 05 | `05_pipeline_dados.ipynb` | §6 | `data/scrape.py`, `data/dataset.py` |
-| 06 | `06_treinamento.ipynb` | §7 | `training/train.py` |
-| 07 | `07_avaliacao_scaling.ipynb` | §8 | `training/evaluate.py`, `inference/generate.py` |
+| 01 | `01_transformer_intuicao.ipynb` | nb 01 | `model/layers/attention.py`, `model/block.py` |
+| 02 | `02_tokenizacao_bpe.ipynb` | nb 02 | `tokenizer/bpe.py` |
+| 03 | `03_arquitetura_base.ipynb` | nb 03 | `model/block.py`, `model/transformer.py` |
+| 04 | `04_modernizacao_llama.ipynb` | nb 04 | `model/layers/{rmsnorm,swiglu,rope,attention}.py` |
+| 05 | `05_pipeline_dados.ipynb` | nb 05 | `data/scrape.py`, `data/dataset.py` |
+| 06 | `06_treinamento.ipynb` | nb 06 | `training/train.py` |
+| 07 | `07_avaliacao_scaling.ipynb` | nb 07 | `training/evaluate.py`, `inference/generate.py` |
 
 ### ✅ Concluído — infraestrutura
 
@@ -52,7 +52,7 @@ treino convergindo e geração):
 | `data/scrape.py` | 05 | limpeza componível + rate limit/Retry-After |
 
 **Correção de bug herdado:** `num_params()` subtraía `V·d` indevidamente
-(`parameters()` já deduplica o peso do weight tying). Agora bate com o paper:
+(`parameters()` já deduplica o peso do weight tying). Agora bate com a contagem esperada:
 medium **42,7M**, large 91,2M, xl 210,8M.
 
 ### ✅ Concluído — entrypoint e config
@@ -88,11 +88,14 @@ sliding vs chunked, RMSNorm em BF16, top-p. Rodar: `python -m pytest`.
 
 1. **Mais dados** (a alavanca real): recolher as demais categorias de física
    (o scrape parou na 1ª — `Particle_physics`); alvo ~10-100M tokens.
-2. **Treinar o `medium`/`large` em GPU** (aqui é CPU-only): reproduzir os números do
-   paper (val_loss ~2,13; BPC ~0,68 no corpus 2×) com `configs/medium.yaml`.
-3. **Roadmap além do pré-treino** (paper §9, ver `ARCHITECTURE.md`): avaliação
-   estruturada, Muon, GQA, SFT+LoRA. Achado central confirmado no nosso próprio
-   treino: **o gargalo é dado, não capacidade**.
+2. **Treinar o `medium`/`large` em GPU** (aqui é CPU-only): a referência mais próxima
+   é CUNHA (2026), que reporta val_loss ~2,13 e BPC ~0,68 para um 43M sobre 25,3M
+   tokens de Wikipedia técnica — alvo a bater com `configs/medium.yaml`.
+3. **Roadmap além do pré-treino** (ver `ARCHITECTURE.md`): avaliação
+   estruturada, Muon, GQA, SFT+LoRA. Achado central medido aqui
+   (`scripts/ablacao_entropia_volume.py`): no regime de 1,8M parâmetros **a entropia
+   do corpus domina o volume** — 84% da queda de val_loss vem de trocar o domínio
+   com o volume fixo, 16% de multiplicar os dados por 7.
 
 ## Convenções do projeto (para não quebrar)
 

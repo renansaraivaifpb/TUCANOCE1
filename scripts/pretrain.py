@@ -32,7 +32,7 @@ from tucanoce.training.train import train
 
 EOT = "<|endoftext|>"
 
-# Fallback offline: minicorpus de física (mesmo domínio do paper).
+# Fallback offline: minicorpus de física (mesmo domínio do corpus inicial).
 _FALLBACK_CORPUS = [
     "the electron is a fundamental particle with negative electric charge",
     "quantum mechanics describes the behavior of particles at atomic scales",
@@ -83,7 +83,7 @@ def get_tokenizer(texts: list[str], vocab_size: int, tok_path: str) -> BPETokeni
 def load_or_cache_tokens(texts, tokenizer, cache_path, tokenizer_id, corpus_path=None):
     """Tokeniza o corpus num fluxo único (com EOT entre docs), cacheando em disco.
 
-    Validação robusta (§6.3): o cache depende de DUAS coisas — o tokenizer E o
+    Validação robusta (nb 05): o cache depende de DUAS coisas — o tokenizer E o
     conteúdo do corpus. Validamos o id do tokenizer E o mtime do corpus. Checar só
     um dos dois é a armadilha clássica do nb 05: re-limpei o corpus sem trocar o
     tokenizer -> mtime muda, cache invalida; retreinei o tokenizer sem mexer no

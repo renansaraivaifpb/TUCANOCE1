@@ -18,10 +18,15 @@ data/*.jsonl
 data/*.pt
 data/*.json
 checkpoints/*.pt
+results/*.pt
 
 # Mantém as pastas e seus READMEs no repositório
 !data/README.md
 !checkpoints/README.md
+
+# results/: as MÉTRICAS (JSON) e as FIGURAS são versionadas de propósito — são o
+# insumo das tabelas e figuras do artigo, e sem elas os números não são audit��veis.
+# Só os checkpoints ficam de fora, pela regra acima.
 
 # Materiais de estudo (PDFs — não versionar; alguns têm direitos autorais)
 *.pdf

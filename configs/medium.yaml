@@ -1,4 +1,4 @@
-# Preset medium (43M) — o carro-chefe do paper (seção 8).
+# Preset medium (43M) — alvo para treino em GPU (ainda não treinado; ver PROGRESS.md).
 # Camada de config real (YAML): centraliza hiperparâmetros em vez de hardcode.
 model:
   preset: medium        # d=512, L=12, H=8

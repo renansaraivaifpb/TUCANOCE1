@@ -1,0 +1,39 @@
+{
+  "piso_trivial": 8.317766166719343,
+  "vocab": 4096,
+  "corpora": [
+    {
+      "corpus": "Física de partículas",
+      "tokens": 415878,
+      "bytes": 1679610,
+      "bytes_por_token": 4.03870846738707,
+      "tipos": 3859,
+      "H1": 4.804777412186118,
+      "H2": 3.2686655435087086,
+      "val_loss": 3.087,
+      "margem_sobre_bigrama": 0.18166554350870845
+    },
+    {
+      "corpus": "Machine learning",
+      "tokens": 590377,
+      "bytes": 2067087,
+      "bytes_por_token": 3.501300016768946,
+      "tipos": 3900,
+      "H1": 4.853852169836111,
+      "H2": 3.339946937894159,
+      "val_loss": 3.017,
+      "margem_sobre_bigrama": 0.3229469378941592
+    },
+    {
+      "corpus": "TinyStories",
+      "tokens": 2914240,
+      "bytes": 6659521,
+      "bytes_por_token": 2.285165600636873,
+      "tipos": 3766,
+      "H1": 4.045602299549429,
+      "H2": 2.9950038187687915,
+      "val_loss": 1.586,
+      "margem_sobre_bigrama": 1.4090038187687914
+    }
+  ]
+}

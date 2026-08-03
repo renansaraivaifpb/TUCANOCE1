@@ -1,4 +1,4 @@
-"""Gera 06_treinamento.ipynb — o loop de treino completo (paper §7)."""
+"""Gera 06_treinamento.ipynb — o loop de treino completo (nb 06)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,13 +7,13 @@ cells = [
 md(r"""
 # 06 — Treinamento: o loop que faz o modelo aprender
 
-> Destilado do paper TucanoCE, §7 (*Treinamento*).
+> Destilado do projeto TucanoCE, nb 06 (*Treinamento*).
 > Objetivo: montar o loop de pré-treino completo — não só `loss.backward()`, mas
 > tudo que separa um treino que converge de um que diverge ou desperdiça compute.
 
 Nos notebooks 01–04 construímos a arquitetura; no 05, os dados. Aqui juntamos:
 um modelo de brinquedo recebe um corpus tokenizado de brinquedo e **aprende**,
-com cada peça de engenharia de treino que o paper usa na RTX 5070.
+com cada peça de engenharia de treino que o projeto usa na RTX 5070.
 
 **O que você vai sair sabendo:**
 1. O objetivo de treino (cross-entropy autoregressiva) e o truque do *label shift*.
@@ -122,11 +122,11 @@ print("  y[0]:", train_y[0].tolist())
 """),
 
 md(r"""
-## 1. Objetivo de treino: cross-entropy autoregressiva (§7.1)
+## 1. Objetivo de treino: cross-entropy autoregressiva (nb 06)
 
 Treinamos por **máxima verossimilhança**: para cada posição $t$, maximizar a
 log-probabilidade do token verdadeiro $x_{t+1}$ dado o prefixo. Em forma de *loss*
-(Eq. 57 do paper):
+(objetivo de máxima verossimilhança):
 
 $$ \mathcal{L}(\theta) = -\frac{1}{BT}\sum_{b=1}^{B}\sum_{t=1}^{T}
    \log P_\theta\big(x^{(b)}_{t+1}\mid x^{(b)}_{1:t}\big) $$
@@ -155,7 +155,7 @@ treino de LM: se a *loss* inicial não está perto de `ln(V)`, algo está errado
 inicialização ou no cálculo da *loss*. (No nb 07 exploramos essa métrica a fundo:
 *bits per token*, BPC.)
 
-## 2. AdamW com weight decay separado (§7.2)
+## 2. AdamW com weight decay separado (nb 06)
 
 Usamos **AdamW** (`lr` pico $3\cdot10^{-4}$, $\beta=(0.9, 0.999)$). A decisão
 não-óbvia é separar os parâmetros em **dois grupos**:
@@ -172,7 +172,7 @@ equilíbrio em vez de regularizar. Mesma lógica para *biases*. A regra prática
 
 code(r"""
 def build_param_groups(model, weight_decay=0.1):
-    # Separa params 2D+ (com decay) de 1D (sem decay). Paper §7.2.
+    # Separa params 2D+ (com decay) de 1D (sem decay). Ver nb 06.
     decay, no_decay = [], []
     for name, p in model.named_parameters():
         if not p.requires_grad:
@@ -194,7 +194,7 @@ print("otimizador:", type(optimizer).__name__, "| 2 grupos de weight_decay")
 """),
 
 md(r"""
-## 3. Scheduler: cosseno com warmup linear (§7.3)
+## 3. Scheduler: cosseno com warmup linear (nb 06)
 
 O learning rate não é constante. Ele:
 
@@ -265,7 +265,7 @@ Repare no formato: sobe rápido até o pico (fim do *warmup*), depois desce
 suavemente. No PyTorch isso vira um `LambdaLR` que multiplica o `lr` base a cada
 `scheduler.step()`.
 
-## 4. Precisão mista BF16 (§7.4)
+## 4. Precisão mista BF16 (nb 06)
 
 Na RTX 5070 (Blackwell) o treino roda sob `torch.autocast(dtype=bfloat16)`. BF16
 mantém o **range dinâmico** do FP32 (8 bits de expoente) sacrificando mantissa
@@ -293,9 +293,9 @@ print("Sem GradScaler: com BF16, chamamos loss.backward() e optimizer.step() dir
 """),
 
 md(r"""
-## 5. Gradient clipping e accumulation (§7.5)
+## 5. Gradient clipping e accumulation (nb 06)
 
-**Clipping por norma global** (Eq. 59): antes do `optimizer.step()`, se a norma
+**Clipping por norma global** : antes do `optimizer.step()`, se a norma
 total dos gradientes passa de 1.0, reescalamos tudo para norma 1.0.
 
 $$ g \leftarrow g \cdot \min\!\Big(1,\ \frac{1}{\lVert g\rVert_2}\Big) $$
@@ -329,7 +329,7 @@ print("optimizer.step() aplicado sobre o batch efetivo B*N.")
 """),
 
 md(r"""
-## 6. Early stopping com save-best (§7.6)
+## 6. Early stopping com save-best (nb 06)
 
 Rodar um número fixo de *epochs* desperdiça *compute* se o modelo já parou de
 melhorar (ou começou a *overfitar*). Duas operações resolvem:
@@ -339,8 +339,8 @@ melhorar (ou começou a *overfitar*). Duas operações resolvem:
 2. **Patience-based stop**: conta *epochs* consecutivos sem melhora
    (`no_improve`). Se `no_improve >= patience`, encerra.
 
-O paper reporta que no *medium* o melhor `val_loss` apareceu no *epoch* 8; os
-*epochs* 9–12 só pioraram — o *early stopping* economizou ~18 min de *compute*.
+No treino do preset *small* sobre o TinyStories, o melhor `val_loss` (1,586)
+apareceu no *epoch* 8 — é o checkpoint que `checkpoints/best.pt` guarda.
 
 ## 7. Tudo junto: o loop de treino completo
 
@@ -355,7 +355,7 @@ code(r"""
 torch.manual_seed(0)
 model = TinyGPT(VOCAB, ctx=CTX)
 MAX_EPOCHS, PATIENCE, ACCUM = 50, 4, 2
-# lr bem acima dos 3e-4 do paper: com só 12 exemplos, isso acelera a memorização
+# lr bem acima dos 3e-4 do projeto: com só 12 exemplos, isso acelera a memorização
 # e torna o overfit (e o early stopping) visíveis em poucos epochs.
 optimizer = torch.optim.AdamW(build_param_groups(model, 0.1),
                               lr=3e-3, betas=(0.9, 0.999), eps=1e-8)
@@ -460,7 +460,7 @@ md(r"""
 **Ligação com o `src/`:** estas peças viram `build_param_groups()` e `train()` em
 `src/tucanoce/training/train.py`. O loop acima é o esqueleto que você vai preencher.
 
-**Caminho de evolução:** o paper aponta o otimizador **Muon** (Jordan et al., 2024)
+**Caminho de evolução:** o projeto aponta o otimizador **Muon** (Jordan et al., 2024)
 como próximo passo — ortogonaliza gradientes de matrizes antes do passo AdamW e
 treina mais rápido na mesma *compute* (ver *NanoGPT speedrun*).
 

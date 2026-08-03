@@ -13,7 +13,7 @@ def test_chunked_default_is_context_len():
 
 
 def test_sliding_vs_chunked_ratio():
-    # ABLAÇÃO central (§6.2): sliding gera ~T_ctx× mais amostras que chunked
+    # ABLAÇÃO central (nb 05): sliding gera ~T_ctx× mais amostras que chunked
     N, T = 200, 8
     tokens = list(range(N))
     sliding = TextDataset(tokens, context_len=T, stride=1)

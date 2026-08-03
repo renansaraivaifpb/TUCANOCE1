@@ -1,4 +1,4 @@
-"""Bloco transformer pre-norm (paper seção 4.1, Eqs. 18-19).
+"""Bloco transformer pre-norm (nb 03).
 
     h = h + Attn(Norm(h))
     h = h + MLP(Norm(h))

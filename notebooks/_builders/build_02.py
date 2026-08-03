@@ -1,4 +1,4 @@
-"""Gera 02_tokenizacao_bpe.ipynb — BPE byte-level estilo GPT-2 (paper §3)."""
+"""Gera 02_tokenizacao_bpe.ipynb — BPE byte-level estilo GPT-2 (nb 02)."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
@@ -7,7 +7,7 @@ cells = [
 md(r"""
 # 02 — Tokenização BPE byte-level
 
-> Destilado da seção 3 do paper (TucanoCE), Algorithms 1 e 2.
+> Escopo: BPE byte-level — treino dos merges, encoding e escolha de `vocab_size`.
 > O modelo não vê texto: vê **inteiros**. O tokenizer é a ponte texto ↔ IDs, e a
 > primeira decisão de arquitetura de dados do projeto.
 
@@ -39,7 +39,7 @@ plt.rcParams.update({
     "axes.grid": True, "grid.alpha": 0.3, "font.size": 10,
 })
 
-# Corpus de brinquedo: frases de física em inglês (mesmo domínio do paper).
+# Corpus de brinquedo: frases de física em inglês (mesmo domínio do projeto).
 # Pequeno de propósito — o algoritmo é o mesmo em 60 MB, só mais lento.
 CORPUS = [
     "the electron is a fundamental particle with negative charge",
@@ -57,7 +57,7 @@ print(f"{len(CORPUS)} documentos, {sum(len(d) for d in CORPUS)} caracteres")
 """),
 
 md(r"""
-## 1. Por que não char-level (§3.1)
+## 1. Por que não char-level (nb 02)
 
 A primeira versão do projeto usava **tokenização por caractere**: cada caractere
 Unicode vira um token. É simples e sem ambiguidade, mas tem dois problemas.
@@ -90,7 +90,7 @@ print("Objetivo do BPE: '"+palavra+"' virar 1-3 tokens, não 11.")
 """),
 
 md(r"""
-## 2. Por que byte-level (§3.2)
+## 2. Por que byte-level (nb 02)
 
 BPE byte-level, como no GPT-2, opera sobre **bytes (0–255)**, não sobre caracteres
 Unicode. Isso tem uma vantagem decisiva: **qualquer texto** — qualquer idioma,
@@ -117,7 +117,7 @@ print("\nvocab inicial = 256 bytes + especiais. Sem <UNK>, cobertura total.")
 """),
 
 md(r"""
-## 3. Treino dos merges — Algorithm 1 (§3.2.2)
+## 3. Treino dos merges — Algorithm 1 (nb 02)
 
 A ideia do BPE em uma frase: **conte os pares de tokens adjacentes mais frequentes,
 funda o par mais comum num token novo, e repita** até atingir o tamanho de
@@ -218,7 +218,7 @@ for (a, b), new_id in list(merges.items())[:20]:
 """),
 
 md(r"""
-## 4. Encoding e decoding — Algorithm 2 (§3.2.3)
+## 4. Encoding e decoding — Algorithm 2 (nb 02)
 
 Para codificar um texto novo: pré-tokeniza, converte cada chunk em bytes, e aplica
 os merges **na ordem em que foram aprendidos**. Como merges antigos (mais
@@ -230,7 +230,7 @@ Decodificar é trivial e **sem perda**: cada id mapeia para uma sequência de by
 `decode(encode(text)) == text` sempre.
 
 Custo do encoding: `O(n · m)` para um chunk de `n` bytes e `m` merges (aplicamos
-cada merge em ordem). Em Python puro isso fica caro em corpus grande — o paper
+cada merge em ordem). Em Python puro isso fica caro em corpus grande — o projeto
 porta exatamente esse loop para C via `ctypes` (~100× mais rápido). Aqui
 priorizamos clareza.
 """),
@@ -334,9 +334,10 @@ tokens; palavras raras ou ausentes (`thermodynamics`) se quebram em mais pedaço
 É exatamente o comportamento desejado — o vocabulário se adapta à distribuição do
 corpus.
 
-## 6. Escolha de `vocab_size` (§3.3)
+## 6. Escolha de `vocab_size` (nb 02)
 
-O GPT-2 original usa `V = 50257`. O paper adota `V = 8192`. Por quê tão menor?
+O GPT-2 original usa `V = 50257`. Aqui adotamos `V = 8192` (e `V = 4096` nos
+experimentos). Por quê tão menor?
 
 O custo escondido está na **embedding table**, de tamanho `V × d`. Para um corpus
 pequeno, dois problemas:
@@ -349,7 +350,7 @@ Vamos fazer a conta para `d = 512` (preset *medium*):
 
 code(r"""
 d = 512
-modelo_total = 43_000_000   # ~43M params do medium (paper)
+modelo_total = 43_000_000   # ~43M params do preset medium
 for V in [8192, 50257]:
     emb_params = V * d
     pct = 100 * emb_params / modelo_total
@@ -363,7 +364,7 @@ print("ainda reaproveita essa matriz como projeção de saída, dobrando o ganho
 
 md(r"""
 A figura deixa o trade-off óbvio: a fração do modelo gasta só na embedding cresce
-linearmente com `vocab_size`. O `V=8192` do paper (verde) fica numa faixa saudável;
+linearmente com `vocab_size`. O `V=8192` do projeto (verde) fica numa faixa saudável;
 o `V=50257` do GPT-2 (vermelho) domina o orçamento quando o modelo é pequeno.
 """),
 
@@ -387,7 +388,7 @@ mas embedding mais cara e tokens mais raros. `V` **menor** → embedding barata 
 tokens bem treinados, mas sequências mais longas. O ponto ótimo depende do tamanho
 do corpus — para ~12,5M tokens, 8192 é um equilíbrio sensato.
 
-## 7. Cache de tokens e a armadilha do `mtime` (§3.4)
+## 7. Cache de tokens e a armadilha do `mtime` (nb 02)
 
 Tokenizar 60 MB em Python leva ~145 s. Repetir isso a cada `train.py` é tempo
 morto. A solução é **cachear os tokens em disco**: a primeira chamada codifica e
@@ -418,7 +419,7 @@ with tempfile.TemporaryDirectory() as tmp:
         f.write("the electron has charge")
 
     def cache_valido(corpus_f, cache_f):
-        # invalidação ingênua: só compara mtime (o que o paper faz por padrão)
+        # invalidação ingênua: só compara mtime (o que o projeto faz por padrão)
         if not os.path.exists(cache_f):
             return False
         return os.path.getmtime(cache_f) >= os.path.getmtime(corpus_f)

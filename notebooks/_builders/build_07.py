@@ -1,20 +1,21 @@
-"""Gera 07_avaliacao_scaling.ipynb — avaliação, sampling e diagnóstico Chinchilla (paper §8, §2.8)."""
+"""Gera 07_avaliacao_scaling.ipynb — avaliação, sampling e entropia do corpus."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _nbbuild import md, code, build
 
 cells = [
 md(r"""
-# 07 — Avaliação, sampling e escalonamento (Chinchilla)
+# 07 — Avaliação, sampling e entropia do corpus
 
-> Destila a seção 8 (Resultados) e a 2.8 (amostragem) do paper TucanoCE.
+> Escopo: interpretar a cross-entropy, sampling, geração e o estudo de entropia
+> do corpus (resultados do projeto).
 > Fecha a série: aqui medimos *quão bom* o modelo é, *como* geramos texto dele,
-> e a lição de escala mais importante do projeto.
+> e qual fator de fato limita um modelo pequeno.
 
 Treinar é metade; a outra metade é saber **ler o número**. Uma cross-entropy de
-2,27 é boa ou ruim? O que ela diz em bits? Como transformo logits em texto sem que
-o modelo entre em loop? E — a pergunta que ordena todo o roadmap — quando vale a
-pena aumentar o modelo em vez de os dados?
+1,586 é boa ou ruim? O que ela diz em bits? Como transformo logits em texto sem que
+o modelo entre em loop? E — a pergunta que ordena todo o roadmap — o que limita um
+modelo pequeno: a complexidade do texto ou a quantidade dele?
 
 **O que você vai sair sabendo:**
 1. Interpretar cross-entropy: o piso `log(V)`, informação ganha por token, e BPC
@@ -23,8 +24,8 @@ pena aumentar o modelo em vez de os dados?
 3. Implementar `sample_next` com temperatura, top-k, top-p e repetition penalty,
    e *ver* cada botão remodelar a distribuição.
 4. Um loop `generate` autoregressivo mínimo.
-5. O diagnóstico Chinchilla (`T ≈ 20·N`) e por que, neste projeto, **o gargalo é
-   dado, não capacidade**.
+5. Por que, com 1,8M parâmetros, **a entropia do corpus domina o volume de dados**
+   — medido por ablação, não afirmado.
 
 Este notebook alimenta os stubs `src/tucanoce/training/evaluate.py` e
 `src/tucanoce/inference/generate.py`.
@@ -43,7 +44,7 @@ print("torch", torch.__version__)
 """),
 
 md(r"""
-## 1. Interpretando a cross-entropy (paper §8.2)
+## 1. Interpretando a cross-entropy (nb 07)
 
 O objetivo de treino é a cross-entropy autoregressiva (nb 06). Mas o valor cru
 — digamos $\mathcal{L}_{val} = 2{,}27$ nats/token — não significa nada isolado.
@@ -54,18 +55,23 @@ vocabulário: probabilidade $1/V$ para cada token. A cross-entropy disso é
 
 $$ \mathcal{L}_{\text{trivial}} = -\log\tfrac{1}{V} = \log V. $$
 
-Com $V = 8192$, isso é $\log 8192 \approx 9{,}01$ nats. Qualquer modelo útil fica
-**abaixo** desse piso. A diferença mede **informação ganha por token** (Eq. 60):
+Com $V = 4096$, isso é $\log 4096 \approx 8{,}32$ nats. Qualquer modelo útil fica
+**abaixo** desse piso. Nosso preset *small* treinado no TinyStories atinge
+$\mathcal{L}_{val} = 1{,}586$, e a diferença mede **informação ganha por token**:
 
-$$ \mathcal{L}_{val} - \log V = 2{,}27 - 9{,}01 = -6{,}74 \text{ nats/token}. $$
+$$ \mathcal{L}_{val} - \log V = 1{,}586 - 8{,}318 = -6{,}732 \text{ nats/token}. $$
 
 Convertendo para bits (dividir por $\ln 2$): o modelo elimina $\approx 9{,}7$ bits
 de incerteza por token em relação ao chute cego.
+
+Mas o piso trivial é uma régua frouxa — bater "chute uniforme" é fácil. Uma régua
+honesta é $H_2$, a entropia condicional de bigrama do corpus (o que um contador de
+pares acertaria): 2,995 nats no TinyStories. É contra ela que mediremos o modelo.
 """),
 
 code(r"""
-V = 8192
-L_val = 2.27
+V = 4096
+L_val = 1.586   # small (1,8M) no TinyStories
 
 floor_nats = math.log(V)
 info_gain_nats = L_val - floor_nats          # negativo: reduzimos a incerteza
@@ -80,13 +86,13 @@ assert floor_nats > L_val, "um modelo útil fica abaixo do piso"
 md(r"""
 **Bits per character (BPC).** A cross-entropy crua depende do tokenizer: mudar o
 vocabulário muda a escala e a comparação deixa de ser justa. A métrica portável é
-**bits por caractere** (Eq. 61): quantos bits o modelo gasta, em média, por
+**bits por caractere** : quantos bits o modelo gasta, em média, por
 *byte* do texto original — independente de como o texto foi fatiado em tokens.
 
 $$ \text{BPC} = \frac{\mathcal{L}_{val}}{\text{bytes\_por\_token}\cdot \ln 2}. $$
 
-Se cada token comprime em média $\approx 4{,}65$ bytes (razão de compressão do BPE
-medida no corpus, ver nb 02), então:
+No TinyStories cada token comprime em média $2{,}29$ bytes (medido por
+`scripts/entropia_corpora.py`, ver nb 02), então:
 """),
 
 code(r"""
@@ -94,18 +100,22 @@ def bits_per_char(val_loss_nats: float, bytes_per_token: float) -> float:
     '''Cross-entropy (nats/token) -> bits por caractere. Portável entre tokenizers.'''
     return val_loss_nats / (bytes_per_token * math.log(2))
 
-bpc = bits_per_char(L_val, bytes_per_token=4.65)
-print(f"BPC do TucanoCE medium   = {bpc:.3f} bits/char")
-print(f"BPC do GPT-2 small (ref) = 0.930 bits/char (WebText)")
-assert abs(bpc - 0.71) < 0.02
+bpc = bits_per_char(L_val, bytes_per_token=2.29)
+print(f"BPC do TucanoCE small (in-corpus) = {bpc:.3f} bits/byte")
+print(f"BPB no held-out (benchmark.py)    = 1.013 bits/byte")
+print(f"BPB do GPT-2 124M, zero-shot      = 0.772 bits/byte")
+assert abs(bpc - 1.00) < 0.02
 """),
 
 md(r"""
-O modelo do paper (~43M params) atinge **BPC ≈ 0,71**, *melhor* que o GPT-2 small
-(~124M params, ~0,93 BPC no WebText). Isso **não** significa que ele é melhor: o
-corpus dele é Wikipedia de física — domínio muito mais estreito e previsível que
-o WebText geral. Restringir o domínio facilita a tarefa. É um lembrete de que
-métrica sem contexto engana: BPC só é comparável no *mesmo* tipo de dado.
+Sobre 150 histórias *held-out*, o `benchmark.py` mede **BPB 1,013** para o nosso
+*small* contra **0,772** do GPT-2 (124M, *zero-shot*). O GPT-2 comprime melhor — e
+boa parte disso é estrutural, não mérito de dados: ele tem contexto 8× maior (1024
+contra 128) e vocabulário de 50.257 tokens, que fragmenta menos o texto.
+
+O ponto que importa: BPB mede **compressão, não adequação à tarefa**. Pedido a gerar
+uma história, o GPT-2 ignora o gênero e entra em laço; o nosso *small* de 1,8M produz
+narrativa no estilo correto. "Menor BPB" não é "melhor na tarefa que interessa".
 """),
 
 md(r"""
@@ -116,8 +126,8 @@ md(r"""
 - **accuracy**: fração de posições em que o token de maior logit é o correto.
 
 Acurácia é uma métrica *dura* (acertou/errou), menos suave que a loss. Ela satura
-antes: no paper, a acurácia trava em ~54,6% enquanto a loss ainda melhora — o
-modelo fica mais *calibrado* (dá mais probabilidade ao token certo) sem
+antes: no nosso treino no TinyStories ela estaciona em ~66% enquanto a loss ainda
+melhora — o modelo fica mais *calibrado* (dá mais probabilidade ao token certo) sem
 necessariamente mudar qual é o argmax. Por isso a loss, e não a acurácia, guia as
 decisões de treino.
 
@@ -204,51 +214,65 @@ exatamente esta. É o que vai no stub `evaluate.py`.
 """),
 
 md(r"""
-### Lendo uma curva de treino real: a assinatura do *overfitting*
+### Lendo uma curva de treino real: onde o *early stopping* morde
 
-A Tabela 1 do paper traz a curva completa do treino do `medium` (43M) sobre 12,5M
-tokens. Plotada, ela mostra o padrão que o *early stopping* (nb 06) existe para
-capturar: a **train loss cai monotonicamente**, mas a **val loss** para de melhorar
-no *epoch* 8 e depois **vira para cima**. A partir daí o modelo está memorizando o
-treino em vez de generalizar — é o **overfitting**. O checkpoint salvo é o do
-melhor `val_loss` (epoch 8), não o do último epoch.
+A célula abaixo carrega a curva de um treino de verdade deste projeto — a ablação de
+entropia/volume (`scripts/ablacao_entropia_volume.py`), preset *small* sobre 415.878
+tokens do TinyStories. É a curva que o *early stopping* (nb 06) existe para ler: a
+`val_loss` cai, achata, e em algum ponto para de melhorar. O `patience` conta
+*epochs* sem melhora a partir daí; o checkpoint salvo é o do **melhor** `val_loss`,
+não o do último *epoch*.
+
+Se o JSON de resultados não existir, rode o script antes — não há número
+*hardcoded* aqui de propósito: a figura tem que sair do experimento.
 """),
 
 code(r"""
+import json, os
 import matplotlib.pyplot as plt
 
-# Dados reais da Tabela 1 do paper (medium, 43M, corpus 12,5M tokens).
-epochs    = list(range(1, 13))
-train_loss = [4.848, 3.045, 2.607, 2.412, 2.285, 2.182, 2.091, 2.008, 1.928, 1.851, 1.775, 1.701]
-val_loss   = [3.315, 2.653, 2.460, 2.371, 2.321, 2.290, 2.275, 2.266, 2.271, 2.276, 2.289, 2.306]
-best = int(np.argmin(val_loss))            # índice do melhor val_loss
+RES = "../results/ablacao_entropia_volume.json"   # relativo a notebooks/
+if not os.path.exists(RES):
+    RES = "results/ablacao_entropia_volume.json"
 
-fig, ax = plt.subplots(figsize=(7, 4))
-ax.plot(epochs, train_loss, "o-", label="train loss", color="#1f77b4")
-ax.plot(epochs, val_loss, "s-", label="val loss", color="#d62728")
-ax.axvline(epochs[best], ls="--", color="gray")
-ax.annotate(f"melhor val_loss\n(epoch {epochs[best]}, {val_loss[best]:.3f})\n= checkpoint salvo",
-            xy=(epochs[best], val_loss[best]), xytext=(epochs[best] + 1.2, 2.6),
-            arrowprops=dict(arrowstyle="->"), fontsize=9)
-ax.axvspan(epochs[best], epochs[-1], alpha=0.08, color="red")
-ax.text(10.3, 2.0, "overfitting\n(val sobe,\ntrain cai)", color="#d62728", fontsize=9, ha="center")
-ax.set_xlabel("epoch"); ax.set_ylabel("cross-entropy (nats/token)")
-ax.set_title("Curva de treino do medium (Tabela 1 do paper)")
-ax.legend(); ax.grid(alpha=0.3)
-plt.tight_layout(); plt.show()
+if not os.path.exists(RES):
+    print(f"sem {RES} — rode: python scripts/ablacao_entropia_volume.py")
+else:
+    r = json.load(open(RES, encoding="utf-8"))
+    hist = r["history"]
+    epochs = [h["epoch"] for h in hist]
+    val    = [h["val_loss"] for h in hist]
+    acc    = [h["acc"] for h in hist]
+    best   = int(np.argmin(val))
 
-print(f"train loss: cai de {train_loss[0]:.2f} a {train_loss[-1]:.2f} (monotônico)")
-print(f"val loss  : mínimo {val_loss[best]:.3f} no epoch {epochs[best]}, depois SOBE -> overfitting")
-print("early stopping salvaria o epoch 8 e pararia por volta do 12 (patience=4)")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.plot(epochs, val, "s-", color="#d62728", label="val loss")
+    ax.axvline(epochs[best], ls="--", color="gray")
+    ax.annotate(f"melhor val_loss\n(epoch {epochs[best]}, {val[best]:.3f})\n= checkpoint salvo",
+                xy=(epochs[best], val[best]),
+                xytext=(epochs[best] - 4.5, val[best] + 0.5),
+                arrowprops=dict(arrowstyle="->"), fontsize=9)
+    ax.set_xlabel("epoch"); ax.set_ylabel("cross-entropy (nats/token)")
+    ax.set_title(f"Treino real: small (1,8M) em {r['n_tokens']:,} tokens do TinyStories")
+    ax2 = ax.twinx()
+    ax2.plot(epochs, acc, "^:", color="#238b45", alpha=0.7, label="next-token acc")
+    ax2.set_ylabel("acurácia", color="#238b45")
+    ax.legend(loc="upper right"); ax2.legend(loc="center right")
+    ax.grid(alpha=0.3)
+    plt.tight_layout(); plt.show()
+
+    print(f"val loss: {val[0]:.3f} -> mínimo {val[best]:.3f} no epoch {epochs[best]}")
+    print(f"acurácia: {acc[0]:.3f} -> {acc[best]:.3f}")
+    print(f"amostra gerada: {r['sample'][:110]}...")
 """),
 
 md(r"""
-## 3. Sampling: transformando logits em texto (paper §2.8)
+## 3. Sampling: transformando logits em texto (nb 01)
 
 Na geração, a última posição produz logits sobre o vocabulário. Como escolher o
 próximo token? Amostrar da distribuição, mas com controle. Quatro botões:
 
-- **Temperatura $\tau$** (Eq. 16): divide os logits antes do softmax.
+- **Temperatura $	au$**: divide os logits antes do softmax.
   $\tau \to 0$ colapsa no *argmax* (texto previsível, repetitivo); $\tau$ alto
   achata a distribuição (mais variedade, risco de incoerência).
 - **top-k**: mantém só os $k$ tokens mais prováveis, zera o resto. Corta a cauda.
@@ -317,7 +341,7 @@ show("top-p=0.7", torch.softmax(lp, -1))
 md(r"""
 Leia as linhas: `tau=0.5` concentra massa no topo (mais determinístico);
 `tau=2.0` espalha (mais aleatório); `top-k=3` e `top-p=0.7` zeram a cauda, cada um
-por um critério diferente (contagem fixa vs. massa acumulada). Na prática o paper
+por um critério diferente (contagem fixa vs. massa acumulada). Na prática o projeto
 gerou com `temp=0.8, top-k=40` e usou `repetition_penalty=1.2` para escapar de
 loops — combinar temperatura moderada com corte de cauda é o padrão.
 """),
@@ -390,81 +414,129 @@ que falta para a inferência de produção.
 """),
 
 md(r"""
-## 5. Escalonamento: o diagnóstico Chinchilla (paper §8.5–8.6)
+## 5. O que limita um modelo pequeno: entropia do corpus ou volume de dados?
 
-Aqui está a lição de maior valor do projeto. Hoffmann et al. (2022, "Chinchilla")
-derivaram empiricamente que o ótimo de *compute* para um LM ocorre quando
+Duas leituras competem para explicar por que um modelo pequeno vai mal.
+
+A primeira é de **escala**. Hoffmann et al. (2022, "Chinchilla") derivaram que o
+ótimo de *compute* de um LM ocorre em
 
 $$ T^* \approx 20 \cdot N, $$
 
-com $T$ = tokens de treino e $N$ = parâmetros. A razão $T/N$ diagnostica o regime:
+com $T$ = tokens de treino e $N$ = parâmetros; $T/N \ll 20$ indica parâmetros
+demais para os dados disponíveis. Cunha (2026), num setup irmão deste rodado em
+GPU, reporta exatamente esse regime: sobre um corpus de 25,3M tokens de Wikipedia
+técnica, um modelo de 43M (`L_val` 2,132) **supera** um de 211M, e dobrar
+parâmetros com o corpus fixo não moveu o teto (2,266 → 2,278). Ou seja: naquele
+regime, o gargalo era volume de dados.
 
-- $T/N \ll 20$: **compute constrained** — parâmetros demais para o volume de dados.
-- $T/N \gg 20$: **data constrained** — dados demais para o tamanho do modelo.
+A segunda leitura é de **entropia**. A cross-entropy se decompõe como
 
-O paper rodou um par de experimentos *controlados* que valem ouro:
+$$ \mathcal{L}(\theta) = H(p) + D_{\mathrm{KL}}(p \,\|\, q_\theta), $$
+
+onde $H(p)$ é a entropia da distribuição do próprio corpus — **irredutível**, não
+importa o modelo — e o termo KL é o que a capacidade pode fechar. Trocar o corpus
+por um de $H(p)$ menor baixa o piso *e* encurta a distância que o modelo precisa
+percorrer. Isso prevê algo que a leitura de escala não prevê: **com o volume de
+dados fixo**, só mudar o domínio para texto mais simples deve derrubar a loss.
+
+Os dois efeitos estavam confundidos no nosso estudo de corpora (o TinyStories tem
+~7× mais tokens que o de física). A ablação em `scripts/ablacao_entropia_volume.py`
+desacopla: TinyStories truncado ao **mesmo** número de tokens da física (415.878),
+mesmo preset, mesmos hiperparâmetros.
 """),
 
 code(r"""
-import pandas as pd  # se não houver pandas, ver célula alternativa abaixo
+import json, os
 
-exp = pd.DataFrame([
-    # modelo,          N (M), tokens (M), L_val,  BPC,   observação
-    ("medium v2",      42.7,  12.5,       2.266,  0.719, "baseline"),
-    ("large v1",       91.2,  12.5,       2.278,  0.723, "2x params, MESMO corpus"),
-    ("xl",            210.8,  25.3,       2.155,  None,  "4.9x params, corpus 2x"),
-    ("medium v3",      42.7,  25.3,       2.132,  0.677, "MESMO modelo, corpus 2x"),
-], columns=["modelo", "N_M", "tokens_M", "L_val", "BPC", "obs"])
-exp["T/N"] = (exp["tokens_M"] / exp["N_M"]).round(2)
-print(exp.to_string(index=False))
+# Dados MEDIDOS neste projeto (preset small, 1,8M params, V=4096).
+# Reproduzir: scripts/entropia_corpora.py e scripts/ablacao_entropia_volume.py
+rows = [
+    # condição,                      tokens,    H2 (bigrama), val_loss, acc
+    ("Física de partículas",          415_878,  3.269,        3.087,    0.500),
+    ("Machine learning",              590_377,  3.340,        3.017,    0.490),
+    ("TinyStories (truncado)",        415_878,  2.995,        1.823,    0.632),
+    ("TinyStories (completo)",      2_914_240,  2.995,        1.586,    0.660),
+]
+print(f"{'condição':26} {'tokens':>10} {'H2':>6} {'val_loss':>9} {'margem':>7} {'acc':>6}")
+for nome, t, h2, vl, acc in rows:
+    print(f"{nome:26} {t:>10,} {h2:>6.3f} {vl:>9.3f} {h2-vl:>7.3f} {acc:>6.3f}")
+
+# decomposição do efeito total, com o volume controlado
+total    = 3.087 - 1.586
+entropia = 3.087 - 1.823   # volume FIXO em 415.878 tokens: só o domínio muda
+volume   = 1.823 - 1.586   # entropia FIXA: só o volume cresce 7x
+print(f"\nqueda total física -> TinyStories completo: {total:.3f} nats")
+print(f"  atribuível à ENTROPIA do corpus: {entropia:.3f} nats ({100*entropia/total:.0f}%)")
+print(f"  atribuível ao VOLUME de dados  : {volume:.3f} nats ({100*volume/total:.0f}%)")
 """),
 
 md(r"""
-Leia a tabela pela ótica dos pares controlados:
+Leia pelos pares controlados:
 
-1. **`medium v2` → `large v1`**: dobrar os parâmetros (43M → 91M) com o **mesmo
-   corpus** de 12,5M tokens **não** moveu o teto (`L_val` 2,266 → 2,278; até piorou
-   de leve). Capacidade extra não vira qualidade quando os dados não crescem.
-2. **`medium v2` → `medium v3`**: dobrar os **dados** (12,5M → 25,3M tokens) com o
-   **mesmo modelo** derrubou `L_val` de 2,266 para 2,132 (−5,9%) e subiu BPC.
-3. O golpe final: **`medium v3` (43M) supera `xl` (211M)** no mesmo corpus de
-   25,3M tokens. Um modelo 4,9× menor vence — porque tem dados na proporção certa.
+1. **Física → TinyStories truncado** (volume idêntico, 415.878 tokens): `val_loss`
+   3,087 → **1,823**. Nada mudou além do domínio do texto. É o efeito da entropia,
+   isolado. E é um limite *inferior*: o controle ainda melhorava no teto de 12
+   *epochs*, então o efeito real da entropia é pelo menos este.
+2. **TinyStories truncado → completo** (entropia idêntica, 7× tokens): 1,823 →
+   1,586. O volume contribui, mas **muito menos**.
+3. A coluna `margem` ($H_2 -$ `val_loss`) diz o que o modelo aprendeu além de
+   coocorrência local: **0,18 nats** na física contra **1,41** no TinyStories
+   completo. Nos corpora técnicos o modelo de 1,8M praticamente não supera um
+   contador de bigramas — o que explica a geração incoerente melhor do que a loss
+   sozinha.
 
-> **O gargalo é dado, não capacidade.** Dobrar os dados moveu o teto; multiplicar
-> o modelo por ~5× não. É o argumento Chinchilla na forma mais direta que os
-> recursos do projeto permitem demonstrar.
+> **No regime pequeno, a alavanca dominante é a entropia do corpus, não o volume:**
+> 84% da queda vem de trocar o domínio, 16% de multiplicar os dados por 7. Isso
+> não contradiz Chinchilla — complementa. Cunha (2026), com modelos 24–117× maiores,
+> encontrou o volume como gargalo; com 1,8M parâmetros, o gargalo se desloca para a
+> complexidade estatística do texto. Qual fator manda depende de onde se está na
+> curva.
 
-Todos os modelos do projeto estão em $T/N \ll 20$ — ordens de magnitude abaixo do
-ótimo. Vamos ver isso nos presets de arquitetura.
+Ainda assim, vale ver a distância do ótimo Chinchilla nos presets de arquitetura.
 """),
 
 md(r"""
-A figura torna o par controlado visível de um golpe: **menor barra = melhor**.
-`medium v3` (43M, corpus 2×) tem o **menor** `val_loss` — abaixo de `large` (91M) e
-de `xl` (211M). As cores separam por corpus: dobrar os **dados** (barras do corpus
-25,3M) derruba o teto; dobrar os **parâmetros** dentro do mesmo corpus, não.
+A figura põe os dois pares controlados lado a lado. As barras claras têm o **mesmo
+volume** (415.878 tokens): a queda entre elas é entropia pura. As escuras têm a
+**mesma entropia**: a queda entre elas é volume. O primeiro salto é ~5× maior que o
+segundo. A linha tracejada em cada barra marca $H_2$, a loss de um contador de
+bigramas naquele corpus — a distância até a barra é o que o modelo aprendeu além de
+coocorrência local.
 """),
 
 code(r"""
-# Reaproveita o DataFrame `exp` da célula anterior.
-labels = exp["modelo"].tolist()
-vals   = exp["L_val"].tolist()
-# cor por corpus: 12,5M vs 25,3M (corpus 2x)
-colors = ["#c6dbef" if t == 12.5 else "#2171b5" for t in exp["tokens_M"]]
-best_i = int(np.argmin(vals))
+# Reaproveita `rows` da célula anterior.
+labels = ["física\n(416k tok)", "ML\n(590k tok)",
+          "TinyStories\n(416k tok)", "TinyStories\n(2,9M tok)"]
+vals   = [r[3] for r in rows]
+h2s    = [r[2] for r in rows]
+# claro = volume de ~416k (par controlado por volume); escuro = corpus completo
+colors = ["#c6dbef", "#c6dbef", "#4292c6", "#2171b5"]
 
-fig, ax = plt.subplots(figsize=(7, 4))
+fig, ax = plt.subplots(figsize=(7.5, 4))
 bars = ax.bar(labels, vals, color=colors)
-bars[best_i].set_edgecolor("#d62728"); bars[best_i].set_linewidth(2.5)
-for b, v, n in zip(bars, vals, exp["N_M"]):
-    ax.text(b.get_x() + b.get_width()/2, v + 0.003, f"{v:.3f}\n{n:.0f}M",
-            ha="center", va="bottom", fontsize=8)
-ax.set_ylim(2.05, 2.32); ax.set_ylabel("melhor val_loss (nats/token)")
-ax.set_title("Chinchilla: menor barra vence — medium v3 (43M) bate xl (211M)")
-ax.legend(handles=[
-    plt.Rectangle((0,0),1,1,color="#c6dbef"), plt.Rectangle((0,0),1,1,color="#2171b5"),
-    plt.Rectangle((0,0),1,1,fill=False,edgecolor="#d62728",lw=2.5)],
-    labels=["corpus 12,5M", "corpus 25,3M (2x)", "melhor"], fontsize=8)
+for b, v, h2 in zip(bars, vals, h2s):
+    x0, x1 = b.get_x(), b.get_x() + b.get_width()
+    ax.hlines(h2, x0, x1, ls="--", color="#d62728", lw=1.5)
+    ax.text(b.get_x() + b.get_width()/2, v + 0.03, f"{v:.3f}",
+            ha="center", va="bottom", fontsize=9)
+
+# anota os dois efeitos isolados
+ax.annotate("", xy=(2, vals[2]), xytext=(0, vals[0]),
+            arrowprops=dict(arrowstyle="->", color="#238b45", lw=2))
+ax.text(1.0, 2.62, f"entropia\n−{vals[0]-vals[2]:.2f} nats", color="#238b45",
+        fontsize=9, ha="center", fontweight="bold")
+ax.annotate("", xy=(3, vals[3]), xytext=(2, vals[2]),
+            arrowprops=dict(arrowstyle="->", color="#6a51a3", lw=2))
+ax.text(2.5, 1.60, f"volume\n−{vals[2]-vals[3]:.2f} nats", color="#6a51a3",
+        fontsize=9, ha="center", fontweight="bold")
+
+ax.set_ylim(0, 3.7); ax.set_ylabel("melhor val_loss (nats/token)")
+ax.set_title("Entropia do corpus domina o volume no regime de 1,8M parâmetros")
+ax.legend(handles=[plt.Line2D([0], [0], ls="--", color="#d62728")],
+          labels=["$H_2$ (contador de bigramas)"], fontsize=8, loc="upper right")
+ax.grid(axis="y", alpha=0.3)
 plt.tight_layout(); plt.show()
 """),
 
@@ -485,7 +557,7 @@ def est_params(d, L, vocab=8192):
 
 PRESETS = {"small": (128, 6), "base": (256, 8), "medium": (512, 12),
            "large": (768, 12), "xl": (1024, 16)}
-CORPUS_TOKENS = 25_300_000                # corpus v3 do paper
+CORPUS_TOKENS = 25_300_000                # corpus v3 do projeto
 
 print(f"{'preset':7s} {'d':>5} {'L':>3} {'N (M)':>8} {'T/N':>7} {'regime':>18}")
 for name, (d, L) in PRESETS.items():
@@ -535,10 +607,10 @@ antes de escalar o corpus é desperdício de compute.
 | `generate` | loop autoregressivo (KV-cache no nb 04) | `inference/generate.py` |
 | diagnóstico `T/N` | regime Chinchilla; dado vs capacidade | roadmap (`ARCHITECTURE.md`) |
 
-**Caminho de evolução:** o paper Chinchilla (Hoffmann et al., 2022) para a lei de
+**Caminho de evolução:** o projeto Chinchilla (Hoffmann et al., 2022) para a lei de
 escala; e, como ferramenta, `lm-evaluation-harness` (EleutherAI) para trocar
 "loss em held-out" por benchmarks estruturados (HellaSwag, ARC, MMLU) — o próximo
-passo de avaliação citado na seção 9.
+passo de avaliação do roadmap.
 
 **Fim da série (00 → 07).** Agora o exercício: preencha os stubs em `src/tucanoce/`
 a partir do que cada notebook derivou. Ao terminar, `src/` vira um LM treinável —

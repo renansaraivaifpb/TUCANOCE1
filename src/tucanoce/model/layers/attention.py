@@ -1,10 +1,10 @@
-"""Atenção causal multi-head com RoPE e KV-cache (paper seções 4.2 e 5.4).
+"""Atenção causal multi-head com RoPE e KV-cache (nb 03 e nb 04).
 
 - Projeta h em Q, K, V; quebra em H cabeças de dimensão head_dim = d/H.
 - Aplica RoPE em Q e K antes do produto interno.
 - Usa F.scaled_dot_product_attention (Flash Attention quando o hardware suporta),
   evitando materializar a matriz QK^T de tamanho T x T.
-- No decode com cache, is_causal vira Q.size(-2) == K.size(-2) (Listing 4).
+- No decode com cache, is_causal vira Q.size(-2) == K.size(-2).
 
 Ver notebooks 03_arquitetura_base.ipynb e 04_modernizacao_llama.ipynb.
 """
@@ -38,7 +38,7 @@ class CausalSelfAttention(nn.Module):
         v = self.v_proj(x).view(B, T, H, hd).transpose(1, 2)
 
         # offset posicional: com cache, o token novo está na posição global p+k,
-        # então usamos cos/sin dessa posição, não da posição 0 (Eq. 54).
+        # então usamos cos/sin dessa posição, não da posição 0.
         offset = 0 if past_kv is None else past_kv[0].size(-2)
         c = cos[offset:offset + T]
         s = sin[offset:offset + T]
@@ -52,7 +52,7 @@ class CausalSelfAttention(nn.Module):
         new_kv = (k, v) if use_cache else None
 
         # is_causal adaptativo: True no prefill (|Q|==|K|), False no decode de 1 token
-        # (a query única "vê" todo o cache sem máscara). Listing 4.
+        # (a query única "vê" todo o cache sem máscara).
         is_causal = q.size(-2) == k.size(-2)
         dropout_p = self.dropout if self.training else 0.0
         out = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal, dropout_p=dropout_p)

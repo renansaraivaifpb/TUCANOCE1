@@ -1,4 +1,4 @@
-"""SwiGLU MLP — feed-forward estilo LLaMA (paper seção 5.2, Listing 2).
+"""SwiGLU MLP — feed-forward estilo LLaMA (nb 04).
 
 Substitui a MLP GELU-4d do GPT-2 por um Gated Linear Unit com ativação SiLU:
     SwiGLU(x) = (SiLU(x @ W_gate) * (x @ W_up)) @ W_down
@@ -28,5 +28,5 @@ class SwiGLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Ramo com portão: SiLU(gate) filtra o ramo up (linear, sem distorção);
-        # down projeta de volta a embed_dim. Dropout só no fim (§5.2).
+        # down projeta de volta a embed_dim. Dropout só no fim (nb 04).
         return self.dropout(self.down(F.silu(self.gate(x)) * self.up(x)))
